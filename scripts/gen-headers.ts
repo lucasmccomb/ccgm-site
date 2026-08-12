@@ -33,8 +33,11 @@ function walkHtmlFiles(dir: string): string[] {
 /**
  * Scan every built HTML page for inline <script> elements (no src attribute)
  * and return the sha256/base64 CSP token of the one distinct script body
- * found. Returns null when zero inline scripts exist -- true today, because
- * ThemeInit.astro is still an E1 placeholder that E3 fills in.
+ * found. ThemeInit.astro's `?theme=` review-override is the site's one
+ * inline script today (§3.5, E3), so this normally returns exactly one
+ * hash. The zero-inline-script (null) path is retained defensively --
+ * scripts/gen-headers.ts must still produce a valid _headers file if that
+ * script is ever removed.
  */
 export function findInlineScriptHash(rootDir: string): string | null {
   const htmlFiles = walkHtmlFiles(rootDir);

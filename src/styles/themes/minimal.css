@@ -1,0 +1,43 @@
+/*
+ * minimal theme (§3.5, Linear-informed) -- #010102 canvas, 4-step surface
+ * ladder, single lavender accent, Inter Variable, negative display
+ * tracking, no shadows-as-hierarchy. Generous whitespace via a larger
+ * --space-unit and a wider --layout-max than the other two candidates.
+ *
+ * No decorative chrome is added here on purpose: hierarchy comes from the
+ * surface ladder and spacing alone, never from shadows or extra borders --
+ * Base.astro's existing hairline header/footer border is already the only
+ * separator this theme needs.
+ *
+ * Scoped as `html[data-theme='minimal']`, not the bare attribute selector
+ * -- see ascii.css's header comment for why (specificity vs. :root).
+ */
+html[data-theme='minimal'] {
+  --color-bg: #010102;
+  --color-fg: #e6e6ec;
+  --color-accent: #5e6ad2;
+  --color-surface-1: #0c0c10;
+  --color-surface-2: #131319;
+  --color-surface-3: #1b1b23;
+  --color-surface-4: #26262f;
+  --color-border: #4a4a58;
+
+  --font-display: 'Inter Variable', ui-sans-serif, sans-serif;
+  --font-body: 'Inter Variable', ui-sans-serif, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --radius: 0.625rem;
+  --tracking-display: -0.02em;
+  --measure: 68ch;
+
+  /* Layout-bearing tokens (§3.5) -- relaxed density, widest column. */
+  --space-unit: 1rem;
+  --density: relaxed;
+  --layout-max: 80rem;
+  --chrome-style: plain;
+  --rule-style: hairline;
+}
+
+[data-theme='minimal'] .site-header__brand {
+  letter-spacing: var(--tracking-display);
+}

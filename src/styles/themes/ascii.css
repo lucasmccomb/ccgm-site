@@ -1,0 +1,81 @@
+/*
+ * ascii theme (§3.5) -- near-black warm canvas, phosphor-green accent,
+ * JetBrains Mono everywhere, 0 radius, box-drawing-character chrome,
+ * terminal density. Pre-pick default (DEFAULT_THEME in src/lib/site.ts).
+ *
+ * Overrides ONLY the frozen semantic token slots from global.css -- no
+ * markup, only CSS. The box-drawing chrome below targets Base.astro's
+ * existing `.site-header` / `.site-footer` classes (already mounted, not
+ * edited here) with decorative ::before/::after content: repeating
+ * box-drawing characters, not information the page depends on, colored
+ * with --color-fg so it always carries the same contrast guarantee as the
+ * page's own body text.
+ *
+ * The token block below is scoped as `html[data-theme='ascii']`, not the
+ * bare attribute selector: `@import` rules must precede every other rule
+ * in the stylesheet (CSS spec), so these theme files are imported before
+ * global.css's own `:root` placeholder block. Equal-specificity rules
+ * resolve by source order, which would let the later `:root` block win --
+ * adding the `html` type selector raises this block's specificity above
+ * `:root`'s so the theme always wins regardless of import order.
+ */
+html[data-theme='ascii'] {
+  --color-bg: #15120e;
+  --color-fg: #e8e2d6;
+  --color-accent: #39d97a;
+  --color-surface-1: #211d17;
+  --color-surface-2: #2a251d;
+  --color-surface-3: #332d24;
+  --color-surface-4: #3d362b;
+  --color-border: #6b6152;
+
+  --font-display: 'JetBrains Mono', ui-monospace, monospace;
+  --font-body: 'JetBrains Mono', ui-monospace, monospace;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --radius: 0;
+  --tracking-display: normal;
+  --measure: 78ch;
+
+  /* Layout-bearing tokens (§3.5) -- terminal density, narrower column. */
+  --space-unit: 0.5rem;
+  --density: compact;
+  --layout-max: 64rem;
+  --chrome-style: box-drawing;
+  --rule-style: double;
+}
+
+/*
+ * Box-drawing border utilities. Applied to Base.astro's existing header/
+ * footer chrome (no markup change): a thin rule of repeating box-drawing
+ * characters replaces the plain hairline border those elements already
+ * carry. `overflow: hidden` + a long repeating string keeps the rule
+ * clipped to the container's own width at any viewport, so it can never
+ * force horizontal page overflow.
+ */
+[data-theme='ascii'] .site-header,
+[data-theme='ascii'] .site-footer {
+  position: relative;
+}
+
+[data-theme='ascii'] .site-header::after,
+[data-theme='ascii'] .site-footer::before {
+  content: '════════════════════════════════════════════════════════════════════════════════════════════════════════════════';
+  position: absolute;
+  left: 0;
+  right: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  line-height: 1;
+  font-family: var(--font-mono);
+  color: var(--color-fg);
+  pointer-events: none;
+}
+
+[data-theme='ascii'] .site-header::after {
+  bottom: -1px;
+}
+
+[data-theme='ascii'] .site-footer::before {
+  top: -1px;
+}

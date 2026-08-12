@@ -1,39 +1,55 @@
 ---
 /**
- * E1 placeholder -- E2 fills this out (built-from ccgm@sha / site@sha,
- * skipped/sanitized-file notices). Mounted once in Base.astro's footer and
- * not touched again until E2 lands (§7.4).
+ * Footer provenance stamp (§3.3 index meta): built-from SHAs plus a visible
+ * notice when skipped or sanitized files exist. Mounted once in
+ * Base.astro's footer (E1) and filled here (E2) -- not touched again until
+ * E6 (wave 3).
  *
- * Tolerant of missing generated data: src/generated/ is gitignored and only
- * exists after `pnpm ingest` has run, so this reads defensively rather than
- * assuming the file is present.
+ * Tolerant of missing generated data: src/generated/ is gitignored and
+ * only exists after `pnpm ingest` has run, so this reads defensively
+ * rather than assuming the file is present.
  */
-import { existsSync, readFileSync } from 'node:fs';
-
-interface IndexMeta {
-  sourceSha?: string;
-  generatedAt?: string;
-  skippedModules?: unknown[];
-}
-
-const indexPath = new URL('../generated/modules-index.json', import.meta.url);
+import { loadModulesIndex } from '../lib/generated.ts';
+import type { IndexMeta } from '../lib/schema.ts';
 
 let meta: IndexMeta | null = null;
-if (existsSync(indexPath)) {
-  try {
-    const raw = readFileSync(indexPath, 'utf-8');
-    const parsed = JSON.parse(raw) as { meta?: IndexMeta };
-    meta = parsed.meta ?? null;
-  } catch {
-    meta = null;
-  }
+try {
+  meta = loadModulesIndex().meta;
+} catch {
+  meta = null;
 }
+
+const skippedCount = (meta?.skippedModules.length ?? 0) + (meta?.skippedFiles.length ?? 0);
+const sanitizedCount = meta?.sanitizedFiles.length ?? 0;
 ---
 
 {
   meta && (
     <p class="source-stamp" data-source-stamp>
-      built from ccgm@{meta.sourceSha ? meta.sourceSha.slice(0, 7) : 'unknown'}
+      built from ccgm@{meta.sourceSha.slice(0, 7)} &middot; site@{meta.siteSha.slice(0, 7)}
+      {skippedCount > 0 && (
+        <span class="source-stamp__notice" data-skipped-notice>
+          {' '}
+          &middot; {skippedCount} item{skippedCount === 1 ? '' : 's'} skipped during ingest
+        </span>
+      )}
+      {sanitizedCount > 0 && (
+        <span class="source-stamp__notice" data-sanitized-notice>
+          {' '}
+          &middot; {sanitizedCount} file{sanitizedCount === 1 ? '' : 's'} sanitized during ingest
+        </span>
+      )}
     </p>
   )
 }
+
+<style>
+  .source-stamp {
+    margin: 0;
+  }
+
+  .source-stamp__notice {
+    color: var(--color-fg);
+    opacity: 0.75;
+  }
+</style>

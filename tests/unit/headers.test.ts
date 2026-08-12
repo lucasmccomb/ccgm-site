@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -76,6 +77,24 @@ describe('findInlineScriptHash', () => {
     writeFileSync(join(tempDir, 'index.html'), '<script>console.log(1)</script>');
     writeFileSync(join(tempDir, 'other.html'), '<script>console.log(2)</script>');
     expect(() => findInlineScriptHash(tempDir)).toThrow();
+  });
+
+  it('hashes the raw script body -- including leading/trailing whitespace -- not a trimmed copy', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'ccgm-site-headers-'));
+    // An indented inline script, exactly the shape ThemeInit.astro produces
+    // once E3 fills it in: a leading newline and leading/trailing spaces
+    // between the <script> tags and the actual code.
+    const rawBody = "\n    console.log('theme-init')\n  ";
+    writeFileSync(join(tempDir, 'index.html'), `<script>${rawBody}</script>`);
+
+    const hash = findInlineScriptHash(tempDir);
+    const expectedFromRaw = `sha256-${createHash('sha256').update(rawBody, 'utf-8').digest('base64')}`;
+    const expectedFromTrimmed = `sha256-${createHash('sha256').update(rawBody.trim(), 'utf-8').digest('base64')}`;
+
+    // The digest must match the RAW (untrimmed) bytes -- that's what a
+    // browser hashes -- and must NOT match a digest of the trimmed body.
+    expect(hash).toBe(expectedFromRaw);
+    expect(hash).not.toBe(expectedFromTrimmed);
   });
 });
 

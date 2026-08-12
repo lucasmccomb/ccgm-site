@@ -61,8 +61,8 @@ describe('repo invariants (structural, hard-asserted, never loosened)', () => {
       const html = readFileSync(file, 'utf-8');
       let match: RegExpExecArray | null;
       while ((match = scriptTagPattern.exec(html)) !== null) {
-        const body = match[1].trim();
-        if (body.length > 0) bodies.add(body);
+        const rawBody = match[1];
+        if (rawBody.trim().length > 0) bodies.add(rawBody);
       }
     }
 

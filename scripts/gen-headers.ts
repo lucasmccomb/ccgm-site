@@ -46,9 +46,13 @@ export function findInlineScriptHash(rootDir: string): string | null {
     const html = readFileSync(file, 'utf-8');
     let match: RegExpExecArray | null;
     while ((match = scriptTagPattern.exec(html)) !== null) {
-      const body = match[1].trim();
-      if (body.length > 0) {
-        bodies.add(body);
+      // CSP hashes are computed over the exact bytes between the tags -- a
+      // browser hashes what the parser saw, not a trimmed copy. Only use
+      // trim() to decide whether the body is non-empty; the hashed value
+      // itself must stay untrimmed.
+      const rawBody = match[1];
+      if (rawBody.trim().length > 0) {
+        bodies.add(rawBody);
       }
     }
   }

@@ -220,14 +220,6 @@ function main(): void {
   mkdirSync(modulesOutDir, { recursive: true });
 
   const indexPath = join(outDir, 'modules-index.json');
-  if (!force && existsSync(indexPath)) {
-    const existing = JSON.parse(readFileSync(indexPath, 'utf-8'));
-    if (existing?.meta?.repoDir === repoDir) {
-      // Already ingested this exact source with nothing forcing a re-run.
-      // The stub still re-runs cheaply (no network cost), but honoring
-      // --force's absence here keeps parity with E2's idempotency contract.
-    }
-  }
 
   const modulesDir = join(repoDir, 'modules');
   const moduleDirNames = readdirSync(modulesDir).filter((name) =>

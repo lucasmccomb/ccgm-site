@@ -60,4 +60,39 @@ test.describe('smoke', () => {
 
     void baseURL;
   });
+
+  test('CopyButton failure path shows inline error, announces it, and resets to idle', async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== 'chromium',
+      'clipboard patching via addInitScript is only reliable under Chromium/CDP permissions',
+    );
+
+    // Patch navigator.clipboard.writeText to reject BEFORE any page script
+    // runs, so CopyButton's click handler observes a real rejected promise.
+    await page.addInitScript(() => {
+      navigator.clipboard.writeText = () => Promise.reject(new Error('denied'));
+    });
+
+    await page.goto('/');
+
+    const button = page.locator('[data-copy-button]');
+    await button.click();
+
+    // Real contract (src/scripts/copy.ts setState): a rejected clipboard
+    // promise sets data-state="error" and the visible label to the
+    // button's data-error-label ("Copy failed" per CopyButton.astro).
+    await expect(button).toHaveAttribute('data-state', 'error', { timeout: 5000 });
+    await expect(button.locator('[data-copy-label]')).toHaveText('Copy failed');
+
+    const liveRegionId = await button.getAttribute('data-copy-live');
+    expect(liveRegionId).toBeTruthy();
+    const liveRegion = page.locator(`#${liveRegionId}`);
+    await expect(liveRegion).toHaveText('Copy failed');
+
+    // RESET_DELAY_MS in src/scripts/copy.ts is 2000ms -- wait on the
+    // condition (the attribute value), never on a fixed sleep.
+    await expect(button).toHaveAttribute('data-state', 'idle', { timeout: 5000 });
+  });
 });

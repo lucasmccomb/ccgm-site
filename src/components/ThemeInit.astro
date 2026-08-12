@@ -17,12 +17,19 @@
  * stylesheet), and it keeps the script's bytes exactly what ships in the
  * page -- scripts/gen-headers.ts hashes the built output, and a bundled/
  * processed script's hash would not be stable or predictable from source.
+ *
+ * The valid-theme list is `define:vars`-injected from site.ts's `THEMES`
+ * export rather than hardcoded here a second time -- `define:vars` embeds
+ * the value as a JSON literal at build time, so the emitted script is still
+ * a single static `is:inline` script with fully predictable bytes; the hash
+ * in dist/_headers is unaffected as long as this stays the page's only
+ * inline script (asserted by tests/unit/repo-invariants.test.ts).
  */
+import { THEMES } from '../lib/site.ts';
 ---
 
-<script is:inline>
+<script is:inline define:vars={{ THEMES }}>
   (function () {
-    const THEMES = ['ascii', 'minimal', 'serif'];
     const STORAGE_KEY = 'ccgmTheme';
 
     function isValidTheme(value) {

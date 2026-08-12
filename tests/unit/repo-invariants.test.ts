@@ -55,14 +55,20 @@ describe('repo invariants (structural, hard-asserted, never loosened)', () => {
     requireDist();
     const htmlFiles = walk(DIST_DIR, (name) => name.endsWith('.html'));
     const scriptTagPattern = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
-    const bodies = new Set<string>();
+    // body -> the built page(s) it was found on, so a failure names the
+    // offending scripts instead of a bare count.
+    const bodies = new Map<string, string[]>();
 
     for (const file of htmlFiles) {
       const html = readFileSync(file, 'utf-8');
       let match: RegExpExecArray | null;
       while ((match = scriptTagPattern.exec(html)) !== null) {
         const rawBody = match[1];
-        if (rawBody.trim().length > 0) bodies.add(rawBody);
+        if (rawBody.trim().length > 0) {
+          const files = bodies.get(rawBody) ?? [];
+          files.push(file);
+          bodies.set(rawBody, files);
+        }
       }
     }
 
@@ -70,8 +76,22 @@ describe('repo invariants (structural, hard-asserted, never loosened)', () => {
     // `?theme=` review-override). Exactly one distinct body is expected,
     // never zero and never more than one -- a second inline script
     // appearing anywhere is exactly the drift this invariant exists to
-    // catch (§5 E3 acceptance: "CSP hash drift guard still green").
-    expect(bodies.size).toBe(1);
+    // catch (§5 E3 acceptance: "CSP hash drift guard still green"). On
+    // failure, name the offending script bodies (truncated) and the pages
+    // they came from -- a bare "expected 1, received N" gives no lead on
+    // which page introduced the drift.
+    const summary = [...bodies.entries()]
+      .map(([body, files]) => {
+        const trimmed = body.trim();
+        const preview = trimmed.length > 80 ? `${trimmed.slice(0, 80)}…` : trimmed;
+        return `  ${JSON.stringify(preview)} (from: ${files.join(', ')})`;
+      })
+      .join('\n');
+
+    expect(
+      bodies.size,
+      `expected exactly one distinct inline <script> body, found ${bodies.size}:\n${summary}`,
+    ).toBe(1);
 
     const headersContent = readFileSync(join(DIST_DIR, '_headers'), 'utf-8');
     expect(headersContent).toContain('sha256-');

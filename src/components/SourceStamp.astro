@@ -1,0 +1,39 @@
+---
+/**
+ * E1 placeholder -- E2 fills this out (built-from ccgm@sha / site@sha,
+ * skipped/sanitized-file notices). Mounted once in Base.astro's footer and
+ * not touched again until E2 lands (§7.4).
+ *
+ * Tolerant of missing generated data: src/generated/ is gitignored and only
+ * exists after `pnpm ingest` has run, so this reads defensively rather than
+ * assuming the file is present.
+ */
+import { existsSync, readFileSync } from 'node:fs';
+
+interface IndexMeta {
+  sourceSha?: string;
+  generatedAt?: string;
+  skippedModules?: unknown[];
+}
+
+const indexPath = new URL('../generated/modules-index.json', import.meta.url);
+
+let meta: IndexMeta | null = null;
+if (existsSync(indexPath)) {
+  try {
+    const raw = readFileSync(indexPath, 'utf-8');
+    const parsed = JSON.parse(raw) as { meta?: IndexMeta };
+    meta = parsed.meta ?? null;
+  } catch {
+    meta = null;
+  }
+}
+---
+
+{
+  meta && (
+    <p class="source-stamp" data-source-stamp>
+      built from ccgm@{meta.sourceSha ? meta.sourceSha.slice(0, 7) : 'unknown'}
+    </p>
+  )
+}

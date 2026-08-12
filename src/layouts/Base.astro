@@ -1,0 +1,85 @@
+---
+/**
+ * Semantic page shell + mount points ONLY.
+ *
+ * Authored once in E1 and not edited again in wave 2 (§7.4): E2 fills
+ * SourceStamp.astro (footer SHA stamp) and E3 fills ThemeInit.astro (theme
+ * review-override script), both already mounted below. E6 (wave 3) is the
+ * only later epic allowed to edit this file, for search + global chrome.
+ *
+ * <html data-theme> is rendered statically from DEFAULT_THEME so the shipped
+ * look survives with JavaScript disabled -- ThemeInit is progressive
+ * enhancement layered on top, never a requirement for a themed page.
+ */
+import '../styles/global.css';
+import SourceStamp from '../components/SourceStamp.astro';
+import ThemeInit from '../components/ThemeInit.astro';
+import { DEFAULT_THEME } from '../lib/site.ts';
+
+interface Props {
+  title: string;
+  description: string;
+}
+
+const { title, description } = Astro.props;
+---
+
+<html lang="en" data-theme={DEFAULT_THEME}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <ThemeInit />
+    <slot name="head" />
+  </head>
+  <body>
+    <header class="site-header">
+      <nav aria-label="Primary">
+        <a href="/" class="site-header__brand">CCGM</a>
+      </nav>
+    </header>
+
+    <main>
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <SourceStamp />
+      <a href="https://github.com/lucasmccomb/ccgm">github.com/lucasmccomb/ccgm</a>
+    </footer>
+  </body>
+</html>
+
+<style>
+  .site-header,
+  .site-footer {
+    padding: var(--space-unit) calc(var(--space-unit) * 2);
+    border-color: var(--color-border);
+  }
+
+  .site-header {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .site-footer {
+    border-top: 1px solid var(--color-border);
+    display: flex;
+    gap: var(--space-unit);
+    font-size: 0.875rem;
+    color: var(--color-fg);
+  }
+
+  .site-header__brand {
+    font-family: var(--font-display);
+    font-weight: 700;
+    text-decoration: none;
+    color: var(--color-fg);
+  }
+
+  main {
+    max-width: var(--layout-max);
+    margin: 0 auto;
+    padding: calc(var(--space-unit) * 2);
+  }
+</style>

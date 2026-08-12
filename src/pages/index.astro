@@ -1,0 +1,58 @@
+---
+/**
+ * Placeholder landing page (E1). Enough surface to exercise the smoke
+ * spec, CopyButton E2E, and header assertions -- E4 (wave 2) replaces this
+ * with the real hero, "what is CCGM" section, and stats strip driven by
+ * scripts/ingest.ts's real output.
+ */
+import Base from '../layouts/Base.astro';
+import AsciiArt from '../components/AsciiArt.astro';
+import CopyButton from '../components/CopyButton.astro';
+
+const installCommand = 'git clone https://github.com/lucasmccomb/ccgm.git && cd ccgm && ./start.sh';
+
+const banner = [
+  ' _____ _____ _____ __  __ ',
+  '/  __ \\  __ \\  __ \\  \\/  /',
+  '| |  | | |  \\/ | |  \\  / ',
+  '| |  | | | __| | |  |  |  ',
+  '| \\__/ | |_\\ \\ |_/ / /  \\ ',
+  ' \\____/\\____/\\___/_/    \\_\\',
+].join('\n');
+---
+
+<Base
+  title="CCGM -- Claude Code God Mode"
+  description="A modular Claude Code configuration system. Browse modules, copy install commands, and point an agent at ccgm.dev."
+>
+  <section class="hero">
+    <AsciiArt label="CCGM -- Claude Code God Mode" art={banner} />
+    <p class="hero__tagline">A modular configuration system for Claude Code.</p>
+
+    <pre id="install-command" class="hero__command">{installCommand}</pre>
+    <CopyButton targetId="install-command" label="the install command" />
+  </section>
+</Base>
+
+<style>
+  .hero {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-unit);
+  }
+
+  .hero__tagline {
+    font-size: 1.125rem;
+    color: var(--color-fg);
+  }
+
+  .hero__command {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: var(--space-unit);
+    font-family: var(--font-mono);
+    overflow-x: auto;
+  }
+</style>

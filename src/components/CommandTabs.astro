@@ -1,0 +1,85 @@
+---
+/**
+ * Accessible install-path tab group (WAI-ARIA APG tabs pattern).
+ * Pass tab definitions via `tabs`; fill each panel via a named slot
+ * matching the tab's `id`.
+ */
+interface Tab {
+  id: string;
+  label: string;
+}
+
+interface Props {
+  tabs: Tab[];
+  groupId: string;
+  ariaLabel: string;
+  defaultTab?: string;
+}
+
+const { tabs, groupId, ariaLabel, defaultTab = tabs[0]?.id } = Astro.props;
+---
+
+<div class="command-tabs" data-command-tabs id={groupId}>
+  <div role="tablist" aria-label={ariaLabel} class="command-tabs__list">
+    {
+      tabs.map((tab) => (
+        <button
+          type="button"
+          role="tab"
+          id={`${groupId}-tab-${tab.id}`}
+          aria-controls={`${groupId}-panel-${tab.id}`}
+          aria-selected={tab.id === defaultTab ? 'true' : 'false'}
+          tabindex={tab.id === defaultTab ? 0 : -1}
+          data-tab-id={tab.id}
+          class="command-tabs__tab"
+        >
+          {tab.label}
+        </button>
+      ))
+    }
+  </div>
+  {
+    tabs.map((tab) => (
+      <div
+        role="tabpanel"
+        id={`${groupId}-panel-${tab.id}`}
+        aria-labelledby={`${groupId}-tab-${tab.id}`}
+        hidden={tab.id !== defaultTab}
+        data-tab-panel={tab.id}
+        class="command-tabs__panel"
+      >
+        <slot name={tab.id} />
+      </div>
+    ))
+  }
+</div>
+
+<script>
+  import '../scripts/tabs.ts';
+</script>
+
+<style>
+  .command-tabs__list {
+    display: flex;
+    gap: var(--space-unit);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .command-tabs__tab {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: var(--space-unit);
+    color: var(--color-fg);
+    font: inherit;
+  }
+
+  .command-tabs__tab[aria-selected='true'] {
+    border-bottom-color: var(--color-accent);
+    font-weight: 600;
+  }
+
+  .command-tabs__panel {
+    padding-top: var(--space-unit);
+  }
+</style>

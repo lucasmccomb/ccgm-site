@@ -1,0 +1,26 @@
+{
+  "name": "sample-workflow",
+  "displayName": "Sample Workflow Module",
+  "description": "A second fixture module with a dependency on sample-core and a config prompt, for exercising ingest across multiple records with cross-links.",
+  "category": "workflow",
+  "scope": ["global", "project"],
+  "dependencies": ["sample-core"],
+  "files": {
+    "commands/sample-workflow.md": {
+      "target": "commands/sample-workflow.md",
+      "type": "command",
+      "template": false
+    },
+    "hooks/sample-hook.py": { "target": "hooks/sample-hook.py", "type": "hook", "template": false },
+    "README.md": { "target": "README.md", "type": "doc", "template": false }
+  },
+  "tags": ["fixture", "workflow"],
+  "configPrompts": [
+    {
+      "key": "exampleFlag",
+      "prompt": "Enable the example flag?",
+      "default": "false",
+      "options": ["true", "false"]
+    }
+  ]
+}

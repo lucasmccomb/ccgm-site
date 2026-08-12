@@ -1,0 +1,23 @@
+{
+  "name": "sample-hazards",
+  "displayName": "Sample Hazards Module",
+  "description": "A fixture module exercising every ingest hazard in one place: an extension-less executable, a merge:true settings fragment, placeholder-templated and scaffold-templated files, a runtime-placeholder file that must not be flagged, a binary asset, an in-repo symlink that escapes its own module dir, an unknown file type, and a postInstall target outside files[].",
+  "category": "patterns",
+  "scope": ["global"],
+  "dependencies": [],
+  "files": {
+    "bin/sample-tool": { "target": "bin/sample-tool", "type": "script", "template": false },
+    "settings.partial.json": { "target": "settings.partial.json", "type": "settings", "template": false, "merge": true },
+    "templates/placeholder.md": { "target": "templates/placeholder.md", "type": "doc", "template": true },
+    "templates/scaffold.md": { "target": "templates/scaffold.md", "type": "doc", "template": true },
+    "lib/runtime-placeholder.sh": { "target": "lib/runtime-placeholder.sh", "type": "lib", "template": false },
+    "assets/logo.png": { "target": "assets/logo.png", "type": "content", "template": false },
+    "lib/mystery.xyz": { "target": "lib/mystery.xyz", "type": "widget", "template": false },
+    "lib/in-repo-symlink.sh": { "target": "lib/in-repo-symlink.sh", "type": "lib", "template": false },
+    "lib/escaped-symlink.sh": { "target": "lib/escaped-symlink.sh", "type": "lib", "template": false },
+    "README.md": { "target": "README.md", "type": "doc", "template": false }
+  },
+  "tags": ["fixture", "hazards"],
+  "configPrompts": [],
+  "postInstall": "postInstall-outside.sh"
+}

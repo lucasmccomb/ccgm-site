@@ -1,0 +1,3 @@
+This file declares an unknown module.json file type ("widget", not one of
+the real 12 known values) so ingest's inventory bucketing collapses it to
+"other" and the census layer can report the drift.

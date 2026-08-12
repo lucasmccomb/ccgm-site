@@ -1,0 +1,11 @@
+{
+  "name": "sample-malformed",
+  "displayName": "Sample Malformed Module",
+  "description": "Deliberately broken JSON (a trailing comma) to exercise the collect-and-skip contract: this module must land in meta.skippedModules with a reason, and every OTHER fixture module must still ingest successfully.",
+  "category": "core",
+  "scope": ["global"],
+  "dependencies": [],
+  "files": {},
+  "tags": ["fixture", "malformed"],
+  "configPrompts": [],
+}

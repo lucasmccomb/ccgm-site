@@ -4,21 +4,77 @@
  * decorative text art: the outer element carries role="img" + a real
  * aria-label describing the art, and the literal characters inside are
  * aria-hidden so a screen reader does not read out box-drawing noise.
+ *
+ * `art` is optional: when a page does not pass its own, this component
+ * loads scripts/ascii-banner.ts's build-time output
+ * (src/generated/banner.txt) as the default -- self-contained so a caller
+ * (E4's landing page) can render <AsciiArt label="..." /> with no
+ * knowledge of the banner-generation mechanism. src/generated/ is
+ * gitignored and only exists after `pnpm banner` (or a full `pnpm build`)
+ * has run, so this reads defensively and falls back to a plain-text label
+ * if the file is missing.
+ *
+ * Resolved from `process.cwd()`, not `import.meta.url`: `astro build`
+ * compiles each .astro component into an SSR bundle under `dist/pages/`,
+ * so `import.meta.url` there points at the BUILT bundle's location, not
+ * this source file's -- a `new URL('../generated/...', import.meta.url)`
+ * silently resolves to a nonexistent `dist/generated/...` and never finds
+ * the file (verified against this repo's own build output). `astro build`
+ * and `astro dev` are both always invoked from the project root, so
+ * `process.cwd()` is the stable anchor -- the same one scripts/*.ts and
+ * tests/unit/repo-invariants.test.ts already use for `dist/`.
  */
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 interface Props {
   label: string;
-  art: string;
+  art?: string;
   class?: string;
 }
 
 const { label, art, class: className = '' } = Astro.props;
+
+function loadDefaultBanner(): string {
+  const bannerPath = join(process.cwd(), 'src', 'generated', 'banner.txt');
+  if (!existsSync(bannerPath)) {
+    return 'CCGM';
+  }
+  try {
+    return readFileSync(bannerPath, 'utf-8');
+  } catch {
+    return 'CCGM';
+  }
+}
+
+const resolvedArt = art ?? loadDefaultBanner();
 ---
 
 <div role="img" aria-label={label} class={`ascii-art ${className}`.trim()}>
-  <pre aria-hidden="true">{art}</pre>
+  <pre aria-hidden="true">{resolvedArt}</pre>
 </div>
 
 <style>
+  /*
+   * `.ascii-art` (not the `<pre>` inside it) is the actual flex item when
+   * this component sits in a flex container (the landing hero is one).
+   * With `align-items: flex-start`, a flex item is never shrunk to fit
+   * its container -- it renders at its own preferred (max-content) size
+   * and is simply aligned to the start of the cross axis, overflowing if
+   * that size exceeds the available space. `pre`'s own `max-width: 100%`
+   * (global.css) doesn't help here because it resolves against the
+   * wrapper's actual (unclamped) width, not the flex container's --
+   * `max-width: 100%` has to be on the flex item itself to clamp it
+   * against `.hero`'s available width. `min-width: 0` accompanies it so
+   * the item can actually shrink that far, since the default flex-item
+   * `min-width: auto` would otherwise floor it at the same preferred
+   * width `max-width` is trying to cap.
+   */
+  .ascii-art {
+    min-width: 0;
+    max-width: 100%;
+  }
+
   .ascii-art pre {
     margin: 0;
     font-family: var(--font-mono);

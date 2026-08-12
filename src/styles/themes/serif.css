@@ -1,0 +1,53 @@
+/*
+ * serif theme (§3.5, Remarque-informed) -- light editorial canvas,
+ * Newsreader display / Inter body (17px min) / JetBrains Mono code, 46rem
+ * measure, OKLCH-specified palette, <=0.5rem radius, motion <=180ms.
+ *
+ * Palette is authored directly in oklch() per the spec -- values verified
+ * against WCAG contrast (fg/bg ~15:1, fg/surface-1 ~14:1, accent/bg ~5.8:1)
+ * before being converted to the oklch() triples below.
+ *
+ * Scoped as `html[data-theme='serif']`, not the bare attribute selector --
+ * see ascii.css's header comment for why (specificity vs. :root).
+ */
+html[data-theme='serif'] {
+  --color-bg: oklch(97.5% 0.01 80);
+  --color-fg: oklch(24% 0.02 55);
+  --color-accent: oklch(50% 0.11 45);
+  --color-surface-1: oklch(95.5% 0.012 75);
+  --color-surface-2: oklch(93% 0.014 75);
+  --color-surface-3: oklch(90% 0.016 70);
+  --color-surface-4: oklch(85.5% 0.018 65);
+  --color-border: oklch(78% 0.02 65);
+
+  --font-display: 'Newsreader Variable', Georgia, serif;
+  --font-body: 'Inter Variable', ui-sans-serif, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --radius: 0.375rem;
+  --tracking-display: normal;
+  --measure: 46rem;
+
+  /* Layout-bearing tokens (§3.5) -- comfortable editorial density, column
+     width sits between the terminal-narrow ascii theme and wide minimal. */
+  --space-unit: 0.75rem;
+  --density: comfortable;
+  --layout-max: 60rem;
+  --chrome-style: rule;
+  --rule-style: solid;
+}
+
+/* Inter body text, 17px minimum per §2/§3.5 -- not itself a frozen token,
+   so it is set directly on the existing `body` selector, theme-scoped. */
+[data-theme='serif'] body {
+  font-size: 17px;
+}
+
+/* Motion <=180ms (§3.5): the only interactive state transition in the
+   shared chrome (CopyButton's state changes) gets a short, calm transition
+   instead of an instant cut -- purely additive CSS on an existing class. */
+[data-theme='serif'] .copy-button {
+  transition:
+    border-color 150ms ease,
+    color 150ms ease;
+}

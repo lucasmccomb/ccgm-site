@@ -4,21 +4,16 @@
  * spec, CopyButton E2E, and header assertions -- E4 (wave 2) replaces this
  * with the real hero, "what is CCGM" section, and stats strip driven by
  * scripts/ingest.ts's real output.
+ *
+ * AsciiArt is used without an explicit `art` prop (E3): it self-loads the
+ * build-time-generated banner (scripts/ascii-banner.ts ->
+ * src/generated/banner.txt) as its default content.
  */
 import Base from '../layouts/Base.astro';
 import AsciiArt from '../components/AsciiArt.astro';
 import CopyButton from '../components/CopyButton.astro';
 
 const installCommand = 'git clone https://github.com/lucasmccomb/ccgm.git && cd ccgm && ./start.sh';
-
-const banner = [
-  ' _____ _____ _____ __  __ ',
-  '/  __ \\  __ \\  __ \\  \\/  /',
-  '| |  | | |  \\/ | |  \\  / ',
-  '| |  | | | __| | |  |  |  ',
-  '| \\__/ | |_\\ \\ |_/ / /  \\ ',
-  ' \\____/\\____/\\___/_/    \\_\\',
-].join('\n');
 ---
 
 <Base
@@ -26,7 +21,7 @@ const banner = [
   description="A modular Claude Code configuration system. Browse modules, copy install commands, and point an agent at ccgm.dev."
 >
   <section class="hero">
-    <AsciiArt label="CCGM -- Claude Code God Mode" art={banner} />
+    <AsciiArt label="CCGM -- Claude Code God Mode" />
     <p class="hero__tagline">A modular configuration system for Claude Code.</p>
 
     <pre id="install-command" class="hero__command">{installCommand}</pre>

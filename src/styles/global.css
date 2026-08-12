@@ -1,6 +1,19 @@
 @import 'tailwindcss';
 
 /*
+ * Three theme candidate token layers (§3.5, E3). Each file overrides the
+ * frozen semantic slots below under its own `[data-theme="..."]` block.
+ * Imported after the neutral placeholder root block so a theme's tokens
+ * win the cascade for any element carrying that attribute -- the
+ * placeholder block only ever applies before JavaScript/build-time theming
+ * sets `data-theme`, which in practice is never (Base.astro always renders
+ * `<html data-theme={DEFAULT_THEME}>` statically).
+ */
+@import './themes/ascii.css';
+@import './themes/minimal.css';
+@import './themes/serif.css';
+
+/*
  * Semantic token slots -- FROZEN NAMES (§3.5 / E1 checkpoint notes).
  *
  * E3 populates one block of these per data-theme in src/styles/themes/*.css.
@@ -106,5 +119,36 @@ body {
   [disabled],
   [aria-disabled='true'] {
     cursor: not-allowed;
+  }
+}
+
+/*
+ * `<pre>` elements (the ASCII banner, install-command blocks, future code
+ * samples) already carry `overflow-x: auto` so long lines scroll inside
+ * themselves instead of forcing page-wide horizontal overflow -- but that
+ * only works once the element's own width is actually constrained.
+ * `.hero` is a column flex container with `align-items: flex-start`,
+ * which sizes flex items to their own shrink-to-fit (content) width
+ * rather than stretching them to the container's cross-size, so a long
+ * unbroken line's natural width wins and the box grows past the viewport
+ * instead of scrolling.
+ *
+ * Two properties are needed together, not just `max-width`: a flex item's
+ * default `min-width` is `auto`, which per the flexbox spec means "never
+ * shrink below your content's own preferred width" -- so a percentage
+ * `max-width` is ignored during the flex container's own intrinsic-sizing
+ * pass (percentages cannot resolve before the container's size is known)
+ * and the item still reports its full unwrapped-line width as its
+ * minimum. `min-width: 0` removes that floor so the item can actually
+ * shrink to the space `.hero` gives it, and `max-width: 100%` then caps
+ * the box once a final width is available, restoring the intended
+ * scroll-inside-the-box behaviour at narrow viewports (375px E2E case in
+ * e2e/themes.spec.ts, §5 E3).
+ */
+@layer base {
+  pre {
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
 }

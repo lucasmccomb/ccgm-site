@@ -51,7 +51,7 @@ describe('repo invariants (structural, hard-asserted, never loosened)', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('dist/**/*.html has at most one distinct inline <script>, and if one exists its hash is in dist/_headers', () => {
+  it('dist/**/*.html has exactly one distinct inline <script> (ThemeInit), and its hash is in dist/_headers', () => {
     requireDist();
     const htmlFiles = walk(DIST_DIR, (name) => name.endsWith('.html'));
     const scriptTagPattern = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -66,14 +66,15 @@ describe('repo invariants (structural, hard-asserted, never loosened)', () => {
       }
     }
 
-    // E1: ThemeInit.astro is a placeholder, so zero is expected today.
-    // E3 fills it in -- at that point exactly one is expected, never more.
-    expect(bodies.size).toBeLessThanOrEqual(1);
+    // E3: ThemeInit.astro now ships the site's one inline script (the
+    // `?theme=` review-override). Exactly one distinct body is expected,
+    // never zero and never more than one -- a second inline script
+    // appearing anywhere is exactly the drift this invariant exists to
+    // catch (§5 E3 acceptance: "CSP hash drift guard still green").
+    expect(bodies.size).toBe(1);
 
-    if (bodies.size === 1) {
-      const headersContent = readFileSync(join(DIST_DIR, '_headers'), 'utf-8');
-      expect(headersContent).toContain('sha256-');
-    }
+    const headersContent = readFileSync(join(DIST_DIR, '_headers'), 'utf-8');
+    expect(headersContent).toContain('sha256-');
   });
 
   it('no package.json script and no .github/workflows/* file contains "pages deploy"', () => {

@@ -1,13 +1,65 @@
 ---
 /**
- * E1 placeholder -- E3 fills this with the real inline, hashed theme-init
- * script (the `?theme=` review-override mechanism; §3.5). Mounted once in
- * Base.astro's <head> and not touched again until E3 lands (§7.4).
+ * The inline `?theme=` review-override script (§3.5). Mounted once in
+ * Base.astro's <head>, before the stylesheet link (verified against built
+ * output -- Astro's `is:inline` scripts render literally at their source
+ * position, while the CSS <link> Base.astro's global.css import produces is
+ * hoisted by Astro to the end of <head>).
  *
- * Renders nothing in E1: the shipped theme is the statically rendered
- * <html data-theme={DEFAULT_THEME}> in Base.astro, so a missing/empty
- * ThemeInit is harmless -- the page is themed with JavaScript disabled.
- * gen-headers.ts and the inline-emission guard both tolerate zero inline
- * <script> elements for exactly this reason.
+ * This is a review/dev mechanism only -- no switcher UI exists anywhere in
+ * the shipped chrome. The shipped look is the statically rendered
+ * <html data-theme={DEFAULT_THEME}> in Base.astro; this script only ever
+ * layers a validated override on top of it for the current page load and,
+ * when persisted, the rest of the browsing session.
+ *
+ * `is:inline` is required for two reasons: it opts the script out of
+ * Astro's bundling/hoisting (so it renders exactly here, before the
+ * stylesheet), and it keeps the script's bytes exactly what ships in the
+ * page -- scripts/gen-headers.ts hashes the built output, and a bundled/
+ * processed script's hash would not be stable or predictable from source.
  */
 ---
+
+<script is:inline>
+  (function () {
+    const THEMES = ['ascii', 'minimal', 'serif'];
+    const STORAGE_KEY = 'ccgmTheme';
+
+    function isValidTheme(value) {
+      return THEMES.indexOf(value) !== -1;
+    }
+
+    const params = new URLSearchParams(location.search);
+    const queryTheme = params.get('theme');
+
+    if (queryTheme !== null && isValidTheme(queryTheme)) {
+      document.documentElement.dataset.theme = queryTheme;
+      try {
+        sessionStorage.setItem(STORAGE_KEY, queryTheme);
+      } catch {
+        // Blocked storage (Safari "block all cookies", some embedded
+        // webviews, third-party framing) throws on write, not just read.
+        // Harmless: the override still applies to documentElement for this
+        // page load, it just will not survive to the next navigation.
+      }
+      return;
+    }
+
+    // No valid query override: fall back to a persisted override from
+    // earlier in this browsing session. An invalid query value (or none at
+    // all) is treated identically here -- it is ignored, never persisted,
+    // and the static default stands unless a prior valid override exists.
+    let stored = null;
+    try {
+      stored = sessionStorage.getItem(STORAGE_KEY);
+    } catch {
+      // Blocked storage throws on read too. Leave the statically rendered
+      // data-theme untouched -- there is nothing to fall back to.
+      stored = null;
+    }
+
+    if (stored !== null && isValidTheme(stored)) {
+      document.documentElement.dataset.theme = stored;
+    }
+  })();
+</script>

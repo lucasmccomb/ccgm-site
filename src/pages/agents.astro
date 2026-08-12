@@ -1,0 +1,176 @@
+---
+/**
+ * Agents page (E4): the machine-readable-surface documentation page.
+ *
+ * The zero-cost module percentage is computed from the ingested collection
+ * at render time -- never a hardcoded census number (§1.4 principle 2/13).
+ */
+import { getCollection } from 'astro:content';
+import Base from '../layouts/Base.astro';
+import CopyButton from '../components/CopyButton.astro';
+import { SITE_URL } from '../lib/site.ts';
+import {
+  AGENTS_INTRO,
+  AGENT_URL_SURFACE,
+  DISCOVERY_HEADERS_TEXT,
+  MD_TWIN_CONVENTION,
+  SCHEMA_VERSION_POLICY,
+  SIZE_CONTRACT,
+  SIZE_CONTRACT_FOLLOWUP,
+  TRUST_FRAMING,
+  URL_IMPERMANENCE,
+  agentPrompts,
+  costMethodologyNote,
+} from '../lib/pagecopy.ts';
+
+const modules = await getCollection('modules');
+const zeroCostCount = modules.filter((mod) => mod.data.contextCostTokens === 0).length;
+const zeroCostPercent = modules.length > 0 ? Math.round((zeroCostCount / modules.length) * 100) : 0;
+
+const prompts = agentPrompts(SITE_URL);
+---
+
+<Base
+  title="Agents -- CCGM"
+  description="The machine-readable surface of ccgm.dev: llms.txt, modules.json, presets.json, Markdown twins, raw file endpoints, size caps, and stability promises."
+>
+  <h1>For agents</h1>
+  <p>{AGENTS_INTRO}</p>
+
+  <section aria-labelledby="url-surface-heading">
+    <h2 id="url-surface-heading">URL surface</h2>
+    <table data-url-surface-table>
+      <thead>
+        <tr>
+          <th>Pattern</th>
+          <th>Content type</th>
+          <th>Purpose</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          AGENT_URL_SURFACE.map((row) => (
+            <tr>
+              <td>
+                <code>{row.pattern}</code>
+              </td>
+              <td>{row.contentType}</td>
+              <td>{row.purpose}</td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </section>
+
+  <section aria-labelledby="md-twin-heading">
+    <h2 id="md-twin-heading">Markdown twins</h2>
+    <p>{MD_TWIN_CONVENTION}</p>
+  </section>
+
+  <section aria-labelledby="discovery-headers-heading">
+    <h2 id="discovery-headers-heading">Discovery headers</h2>
+    <p>{DISCOVERY_HEADERS_TEXT}</p>
+  </section>
+
+  <section aria-labelledby="size-contract-heading">
+    <h2 id="size-contract-heading">Size contract</h2>
+    <table data-size-contract-table>
+      <thead>
+        <tr>
+          <th>Artifact</th>
+          <th>Cap</th>
+          <th>When exceeded</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          SIZE_CONTRACT.map((row) => (
+            <tr>
+              <td>
+                <code>{row.artifact}</code>
+              </td>
+              <td>{row.cap}</td>
+              <td>{row.whenExceeded}</td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+    <p>{SIZE_CONTRACT_FOLLOWUP}</p>
+  </section>
+
+  <section aria-labelledby="stability-heading">
+    <h2 id="stability-heading">Stability promises</h2>
+
+    <h3>schemaVersion policy</h3>
+    <p data-schema-version-policy>{SCHEMA_VERSION_POLICY}</p>
+
+    <h3>URL impermanence</h3>
+    <p data-url-impermanence>{URL_IMPERMANENCE}</p>
+  </section>
+
+  <section aria-labelledby="trust-heading">
+    <h2 id="trust-heading">Trust framing</h2>
+    {TRUST_FRAMING.map((sentence) => <p data-trust-framing>{sentence}</p>)}
+  </section>
+
+  <section aria-labelledby="cost-heading">
+    <h2 id="cost-heading">Cost methodology</h2>
+    <p data-cost-methodology>{costMethodologyNote(zeroCostPercent)}</p>
+  </section>
+
+  <section aria-labelledby="prompts-heading">
+    <h2 id="prompts-heading">Copyable prompts</h2>
+    <ul class="prompt-list">
+      {
+        prompts.map((prompt) => (
+          <li>
+            <p>{prompt.label}</p>
+            <pre id={`agent-prompt-${prompt.id}`} class="command-block">{prompt.text}</pre>
+            <CopyButton targetId={`agent-prompt-${prompt.id}`} label={prompt.label} />
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+</Base>
+
+<style>
+  table[data-url-surface-table],
+  table[data-size-contract-table] {
+    width: 100%;
+    border-collapse: collapse;
+    margin: var(--space-unit) 0;
+  }
+
+  table[data-url-surface-table] th,
+  table[data-url-surface-table] td,
+  table[data-size-contract-table] th,
+  table[data-size-contract-table] td {
+    border: 1px solid var(--color-border);
+    padding: calc(var(--space-unit) * 0.5) var(--space-unit);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .command-block {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: var(--space-unit);
+    font-family: var(--font-mono);
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: calc(var(--space-unit) * 0.5) 0;
+  }
+
+  .prompt-list {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-unit);
+  }
+</style>

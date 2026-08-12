@@ -1,0 +1,110 @@
+@import 'tailwindcss';
+
+/*
+ * Semantic token slots -- FROZEN NAMES (§3.5 / E1 checkpoint notes).
+ *
+ * E3 populates one block of these per data-theme in src/styles/themes/*.css.
+ * No renames or removals; additive extension only, and only alongside a
+ * matching update to plan §3.5 and this file's own comment.
+ *
+ * This block is a neutral placeholder set so the site renders legibly
+ * unthemed before any theme CSS exists.
+ */
+:root {
+  --color-bg: #ffffff;
+  --color-fg: #111111;
+  --color-accent: #3b82f6;
+  --color-surface-1: #f7f7f7;
+  --color-surface-2: #eeeeee;
+  --color-surface-3: #e2e2e2;
+  --color-surface-4: #d4d4d4;
+  --color-border: #cccccc;
+
+  --font-display: ui-sans-serif, system-ui, sans-serif;
+  --font-body: ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --radius: 0.25rem;
+  --tracking-display: normal;
+  --measure: 65ch;
+
+  /* Layout-bearing tokens (§3.5) -- frozen alongside the block above. */
+  --space-unit: 0.5rem;
+  --density: normal;
+  --layout-max: 72rem;
+  --chrome-style: plain;
+  --rule-style: solid;
+}
+
+html {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-body);
+}
+
+body {
+  margin: 0;
+}
+
+/*
+ * Self-hosted fonts (§2). Files are synced into public/fonts/ by
+ * `pnpm fonts:sync` from the pinned @fontsource* devDependencies and
+ * committed -- referenced here by absolute /fonts/... path so Astro's
+ * public-asset pipeline (not the CSS url() resolver) is what has to find
+ * them, matching how they land in dist/.
+ */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/jetbrains-mono-latin-700-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter Variable';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-latin-wght-normal.woff2') format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Newsreader Variable';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/newsreader-latin-wght-normal.woff2') format('woff2-variations');
+}
+
+/*
+ * Tailwind v4's preflight does NOT set cursor: pointer on interactive
+ * elements (frontend-css.md). Without this, every clickable control on the
+ * page looks non-interactive on desktop.
+ */
+@layer base {
+  button,
+  [role='button'],
+  [type='button'],
+  [type='reset'],
+  [type='submit'],
+  a[href],
+  label[for],
+  select,
+  summary {
+    cursor: pointer;
+  }
+
+  [disabled],
+  [aria-disabled='true'] {
+    cursor: not-allowed;
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "name": "ccgm-site",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.32.1",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "ingest": "tsx scripts/ingest.ts",
+    "fonts:sync": "tsx scripts/fonts-sync.ts",
+    "gen:headers": "tsx scripts/gen-headers.ts",
+    "census:check": "tsx scripts/census-check.ts",
+    "census:update": "tsx scripts/census-update.ts",
+    "dev": "astro dev",
+    "build": "pnpm fonts:sync && pnpm ingest && astro build && pnpm gen:headers && pagefind --site dist",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "astro": "5.18.2"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.10",
+    "@eslint/js": "9.38.0",
+    "@fontsource-variable/inter": "5.3.0",
+    "@fontsource-variable/newsreader": "5.3.0",
+    "@fontsource/jetbrains-mono": "5.3.0",
+    "@playwright/test": "1.62.1",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/node": "22.20.1",
+    "eslint": "10.8.1",
+    "eslint-plugin-astro": "3.1.0",
+    "globals": "17.11.0",
+    "pagefind": "1.5.2",
+    "tailwindcss": "4.3.3",
+    "tsx": "4.23.12",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.67.0",
+    "vitest": "4.1.10",
+    "wrangler": "4.122.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "workerd",
+      "@tailwindcss/oxide"
+    ]
+  }
+}

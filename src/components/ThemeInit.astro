@@ -1,0 +1,13 @@
+---
+/**
+ * E1 placeholder -- E3 fills this with the real inline, hashed theme-init
+ * script (the `?theme=` review-override mechanism; §3.5). Mounted once in
+ * Base.astro's <head> and not touched again until E3 lands (§7.4).
+ *
+ * Renders nothing in E1: the shipped theme is the statically rendered
+ * <html data-theme={DEFAULT_THEME}> in Base.astro, so a missing/empty
+ * ThemeInit is harmless -- the page is themed with JavaScript disabled.
+ * gen-headers.ts and the inline-emission guard both tolerate zero inline
+ * <script> elements for exactly this reason.
+ */
+---

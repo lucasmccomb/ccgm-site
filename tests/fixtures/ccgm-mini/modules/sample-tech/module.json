@@ -1,0 +1,14 @@
+{
+  "name": "sample-tech",
+  "displayName": "Sample Tech-Specific Module",
+  "description": "A third fixture module covering the tech-specific category and a templated lib file, with no dependencies.",
+  "category": "tech-specific",
+  "scope": ["project"],
+  "dependencies": [],
+  "files": {
+    "lib/sample-lib.sh": { "target": "lib/sample-lib.sh", "type": "lib", "template": true },
+    "README.md": { "target": "README.md", "type": "doc", "template": false }
+  },
+  "tags": ["fixture", "tech-specific"],
+  "configPrompts": []
+}

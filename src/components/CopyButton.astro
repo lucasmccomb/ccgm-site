@@ -1,0 +1,72 @@
+---
+/**
+ * The one shared copy component every copy surface on the site uses
+ * (§1.4 governing context: "one shared CopyButton for every copy surface").
+ *
+ * Copies the exact textContent of the element with id={targetId}. Announces
+ * state changes via an aria-live region and only shows "copied" after the
+ * clipboard promise resolves; a rejected promise shows an inline error.
+ */
+interface Props {
+  /** id of the element whose textContent gets copied verbatim. */
+  targetId: string;
+  /** Human-readable name of what is being copied, used to build aria-label. */
+  label: string;
+  idleLabel?: string;
+  copiedLabel?: string;
+  class?: string;
+}
+
+const {
+  targetId,
+  label,
+  idleLabel = 'Copy',
+  copiedLabel = 'Copied',
+  class: className = '',
+} = Astro.props;
+
+const liveId = `${targetId}-copy-live`;
+---
+
+<button
+  type="button"
+  data-copy-button
+  data-copy-target={targetId}
+  data-copy-live={liveId}
+  data-idle-label={idleLabel}
+  data-copied-label={copiedLabel}
+  data-error-label="Copy failed"
+  data-state="idle"
+  aria-label={`Copy ${label}`}
+  class={`copy-button ${className}`.trim()}
+>
+  <span data-copy-label>{idleLabel}</span>
+</button>
+<span id={liveId} role="status" aria-live="polite" class="sr-only"></span>
+
+<script>
+  import '../scripts/copy.ts';
+</script>
+
+<style>
+  .copy-button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-unit);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface-1);
+    color: var(--color-fg);
+    padding: calc(var(--space-unit) * 0.5) var(--space-unit);
+    font: inherit;
+  }
+
+  .copy-button[data-state='copied'] {
+    border-color: var(--color-accent);
+  }
+
+  .copy-button[data-state='error'] {
+    border-color: #b91c1c;
+    color: #b91c1c;
+  }
+</style>

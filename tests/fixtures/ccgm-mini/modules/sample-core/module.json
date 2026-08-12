@@ -1,0 +1,14 @@
+{
+  "name": "sample-core",
+  "displayName": "Sample Core Module",
+  "description": "A minimal fixture module used to exercise the E1 ingest contract stub end to end, with no dependencies and no config prompts.",
+  "category": "core",
+  "scope": ["global"],
+  "dependencies": [],
+  "files": {
+    "rules/sample-core.md": { "target": "rules/sample-core.md", "type": "rule", "template": false },
+    "README.md": { "target": "README.md", "type": "doc", "template": false }
+  },
+  "tags": ["fixture", "core"],
+  "configPrompts": []
+}

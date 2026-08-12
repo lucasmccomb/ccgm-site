@@ -1,0 +1,29 @@
+---
+/**
+ * ASCII art wrapper following the W3C ARIA-in-HTML pattern for pre-rendered
+ * decorative text art: the outer element carries role="img" + a real
+ * aria-label describing the art, and the literal characters inside are
+ * aria-hidden so a screen reader does not read out box-drawing noise.
+ */
+interface Props {
+  label: string;
+  art: string;
+  class?: string;
+}
+
+const { label, art, class: className = '' } = Astro.props;
+---
+
+<div role="img" aria-label={label} class={`ascii-art ${className}`.trim()}>
+  <pre aria-hidden="true">{art}</pre>
+</div>
+
+<style>
+  .ascii-art pre {
+    margin: 0;
+    font-family: var(--font-mono);
+    line-height: 1.15;
+    overflow-x: auto;
+    white-space: pre;
+  }
+</style>

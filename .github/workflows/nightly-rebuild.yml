@@ -1,0 +1,245 @@
+name: nightly-rebuild
+
+# The zero-merge-day backstop and drift check (§3.6 point 4, §5 E7). The
+# per-merge trigger (ccgm's site-deploy-hook.yml) is the primary path;
+# this covers the case where ccgm goes quiet and also runs the structural
+# pipeline check + census comparison every night regardless.
+#
+# Real run (schedule, or workflow_dispatch with no inputs): ingest real
+# ccgm main -> full build -> full unit suite (matching ci.yml's order).
+# A failure anywhere in that chain means the CONTENT PIPELINE is broken:
+# open/update an ingest-drift issue and skip the rebuild entirely -- never
+# deploy on top of a broken pipeline. Otherwise `pnpm census:check` a
+# non-empty delta against tests/fixtures/repo-census.json is CONTENT, not
+# breakage (§1.4 principle 13): open/update the same issue naming the
+# delta, and rebuild anyway. Then a single `scripts/verify-rebuild.sh`
+# invocation both POSTs the deploy hook (its own contract: it self-POSTs
+# whenever $CCGM_SITE_DEPLOY_HOOK_URL is present in its environment) and
+# polls for the deploy to actually land -- POSTing is not evidence of a
+# successful rebuild, a Cloudflare-side build failure is otherwise
+# invisible outside the CF dashboard. There is deliberately no separate
+# POST step: calling the hook from both a standalone curl and from
+# verify-rebuild.sh's own self-POST would fire it twice per run.
+#
+# workflow_dispatch inputs exist to verify the drift-check/census/alert
+# paths without waiting for 03:00 UTC or for real ccgm content to actually
+# drift -- see scripts/nightly-check.ts's header comment for exactly how
+# each path was exercised during E7 verification. Passing `repo_dir`
+# always suppresses the hook POST and verification poll too (the "Compute
+# effective deploy gate" step below), regardless of the `suppress_hook`
+# input -- a fixture-based test run must never reach the real deployment.
+# The same gate also skips the whole POST+verify sequence whenever
+# $CCGM_SITE_DEPLOY_HOOK_URL is unset (e.g. pre-HE1) -- otherwise the poll
+# would run anyway, time out after 15 minutes against a site that never
+# rebuilt, and open a false deploy-stale issue every night.
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      repo_dir:
+        description: 'Local/test only: --repo-dir fixture path to force the drift-check path (e.g. tests/fixtures/ccgm-mini for a census delta, or a nonexistent path for a structural failure). Never set this for a real rebuild.'
+        required: false
+        type: string
+      suppress_hook:
+        description: 'Skip POSTing the deploy hook and the rebuild-verification poll -- verify the drift-check/census/alert logic only.'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  nightly-rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # nightly-check.ts's real mode leaves a git clone of ccgm at
+          # .ccgm-src/ -- the sourceSha-descendant check below compares
+          # against that clone's own history via the GitHub API instead,
+          # so this checkout only needs ccgm-site's own (shallow) history.
+          fetch-depth: 1
+
+      - name: Ensure alert labels exist
+        # gh issue create fails (exit 1, no continue-on-error) on an
+        # unrecognized --label, which would red the whole job on the first
+        # real alert instead of filing the diagnostic issue. --force makes
+        # this idempotent -- safe to run every time regardless of whether
+        # the labels already exist.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create ingest-drift -R lucasmccomb/ccgm-site --color d93f0b --description "Nightly rebuild: content pipeline failure or census drift" --force || true
+          gh label create deploy-stale -R lucasmccomb/ccgm-site --color d93f0b --description "Nightly rebuild: deploy did not verify against the live site" --force || true
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check deploy hook secret
+        id: check-secret
+        env:
+          HOOK_URL: ${{ secrets.CCGM_SITE_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$HOOK_URL" ]; then
+            echo "::notice::deploy hook not configured, skipping the POST + verification sequence"
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute effective deploy gate
+        id: gate
+        env:
+          REPO_DIR: ${{ inputs.repo_dir }}
+          SUPPRESS_HOOK: ${{ inputs.suppress_hook }}
+          SECRET_CONFIGURED: ${{ steps.check-secret.outputs.configured }}
+        run: |
+          # A --repo-dir test/fixture run must NEVER touch the real
+          # deployment -- its sourceSha is not a real ccgm commit
+          # ('fixture' for a repo-dir with no .git of its own), so POSTing
+          # the hook or comparing that value against ccgm's history would
+          # either corrupt production with test data or raise a bogus
+          # deploy-stale alert. Force suppression whenever repo_dir is set,
+          # regardless of whether the operator also passed suppress_hook.
+          #
+          # A missing CCGM_SITE_DEPLOY_HOOK_URL secret (e.g. pre-HE1) must
+          # also skip the whole sequence: scripts/verify-rebuild.sh's
+          # poll-only mode would otherwise poll for 15 minutes against a
+          # site that never rebuilds and open a false deploy-stale issue.
+          if [ -n "$REPO_DIR" ] || [ "$SUPPRESS_HOOK" = "true" ] || [ "$SECRET_CONFIGURED" != "true" ]; then
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Structural + census check
+        id: check
+        continue-on-error: true
+        env:
+          REPO_DIR: ${{ inputs.repo_dir }}
+        run: |
+          ARGS=()
+          if [ -n "$REPO_DIR" ]; then
+            ARGS+=(--repo-dir "$REPO_DIR")
+          fi
+          pnpm exec tsx scripts/nightly-check.ts "${ARGS[@]}"
+
+      - name: Open or update ingest-drift issue (structural failure)
+        if: steps.check.outputs.status == 'structural_failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DELTA: ${{ steps.check.outputs.delta }}
+        run: |
+          set -u
+          TITLE="ccgm-site nightly rebuild: structural check failed"
+          BODY="The nightly rebuild's ingest/build/unit-test pipeline failed (run: $RUN_URL). The rebuild was SKIPPED -- ccgm-site is still serving its last good deployment.
+
+          \`\`\`
+          $DELTA
+          \`\`\`"
+          EXISTING="$(gh issue list -R lucasmccomb/ccgm-site --state open --label ingest-drift --json number --jq '.[0].number' 2>/dev/null || echo "")"
+          if [ -n "$EXISTING" ]; then
+            gh issue comment -R lucasmccomb/ccgm-site "$EXISTING" --body "$BODY"
+          else
+            gh issue create -R lucasmccomb/ccgm-site --title "$TITLE" --label ingest-drift --body "$BODY"
+          fi
+
+      - name: Open or update ingest-drift issue (census delta -- content, not breakage)
+        if: steps.check.outputs.status == 'census_delta'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DELTA: ${{ steps.check.outputs.delta }}
+        run: |
+          set -u
+          TITLE="ccgm-site nightly rebuild: census delta detected"
+          BODY="ccgm's module/preset census diverged from the committed tests/fixtures/repo-census.json snapshot (run: $RUN_URL). This is CONTENT, not breakage (§1.4 principle 13) -- the rebuild proceeds. Run \`pnpm census:update\` and correct the §1.4 fact block in the same PR to refresh the snapshot.
+
+          \`\`\`
+          $DELTA
+          \`\`\`"
+          EXISTING="$(gh issue list -R lucasmccomb/ccgm-site --state open --label ingest-drift --json number --jq '.[0].number' 2>/dev/null || echo "")"
+          if [ -n "$EXISTING" ]; then
+            gh issue comment -R lucasmccomb/ccgm-site "$EXISTING" --body "$BODY"
+          else
+            gh issue create -R lucasmccomb/ccgm-site --title "$TITLE" --label ingest-drift --body "$BODY"
+          fi
+
+      - name: Fail the job on structural failure
+        if: steps.check.outputs.status == 'structural_failure'
+        run: |
+          echo "::error::nightly-check reported structural_failure -- see the 'Structural + census check' step above for the failing command. Rebuild skipped." >&2
+          exit 1
+
+      - name: Record the ingested sourceSha (the HEAD recorded at start)
+        id: recorded-sha
+        if: steps.check.outputs.status != 'structural_failure' && steps.gate.outputs.deploy == 'true'
+        run: |
+          SHA="$(python3 -c 'import json; print(json.load(open("src/generated/modules-index.json"))["meta"]["sourceSha"])')"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Verify rebuild landed (POSTs the hook, then polls for generatedAt advance)
+        id: verify
+        if: steps.check.outputs.status != 'structural_failure' && steps.gate.outputs.deploy == 'true'
+        continue-on-error: true
+        env:
+          CCGM_SITE_DEPLOY_HOOK_URL: ${{ secrets.CCGM_SITE_DEPLOY_HOOK_URL }}
+        run: bash scripts/verify-rebuild.sh https://ccgm-site.pages.dev
+
+      - name: Verify sourceSha is the recorded HEAD or a descendant of it
+        id: verify-source-sha
+        if: steps.verify.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RECORDED_SHA: ${{ steps.recorded-sha.outputs.sha }}
+        run: |
+          set -u
+          RECORDED="$RECORDED_SHA"
+          LIVE="$(curl -fsS https://ccgm-site.pages.dev/modules.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["meta"]["sourceSha"])')"
+          echo "recorded (HEAD at start): $RECORDED"
+          echo "live (deployed):          $LIVE"
+          if [ "$RECORDED" = "$LIVE" ]; then
+            echo "sourceSha matches exactly."
+            exit 0
+          fi
+          # A merge landing mid-build must not raise a false deploy-stale
+          # (adrev2-022): accept LIVE if it is a descendant of RECORDED,
+          # i.e. RECORDED is an ancestor of (or equal to) LIVE.
+          STATUS="$(gh api "repos/lucasmccomb/ccgm/compare/${RECORDED}...${LIVE}" --jq '.status' 2>/dev/null || echo "error")"
+          echo "ccgm compare status: $STATUS"
+          if [ "$STATUS" = "identical" ] || [ "$STATUS" = "ahead" ]; then
+            echo "live sourceSha is the recorded HEAD or a descendant of it -- OK."
+            exit 0
+          fi
+          echo "live sourceSha is neither equal to nor a descendant of the recorded HEAD." >&2
+          exit 1
+
+      - name: Open or update deploy-stale issue
+        if: steps.check.outputs.status != 'structural_failure' && steps.gate.outputs.deploy == 'true' && (steps.verify.outcome == 'failure' || steps.verify-source-sha.outcome == 'failure')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -u
+          TITLE="ccgm-site nightly rebuild: deploy did not verify"
+          BODY="The nightly rebuild's deploy hook POST or the post-deploy verification (generatedAt advance / sourceSha match) against https://ccgm-site.pages.dev failed (run: $RUN_URL). The live site may be stale."
+          EXISTING="$(gh issue list -R lucasmccomb/ccgm-site --state open --label deploy-stale --json number --jq '.[0].number' 2>/dev/null || echo "")"
+          if [ -n "$EXISTING" ]; then
+            gh issue comment -R lucasmccomb/ccgm-site "$EXISTING" --body "$BODY"
+          else
+            gh issue create -R lucasmccomb/ccgm-site --title "$TITLE" --label deploy-stale --body "$BODY"
+          fi

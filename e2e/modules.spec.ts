@@ -413,12 +413,25 @@ test.describe('"copy entire module as markdown" copies the .md twin body (§3.4 
 
 test.describe('module detail pages: cross-theme rendering', () => {
   for (const theme of THEMES) {
-    test(`${theme} theme: axe scan of a module detail page has zero critical/serious violations`, async ({
+    test(`${theme} theme: axe scan of a module detail page has zero critical/serious violations, with every file-type <details> section EXPANDED`, async ({
       page,
     }, testInfo) => {
       test.skip(testInfo.project.name !== 'chromium', 'one authoritative a11y run per theme is enough');
 
       await page.goto(`/modules/verification?theme=${theme}`);
+
+      // A closed <details> hides its content from the accessibility tree
+      // entirely, so the default (collapsed) state can never surface an
+      // issue inside a file-entry <pre> -- exactly how the missing
+      // tabindex="0" on ModuleFileSection.astro's scrollable <pre>
+      // elements slipped past this same scan before. Open every declared
+      // file's containing section (reusing the existing per-file helper)
+      // so axe judges the expanded state a real visitor reaches by
+      // clicking a <summary>.
+      for (const path of readRealModuleFileKeys('verification')) {
+        await openDetailsFor(page, path);
+      }
+
       const results = await new AxeBuilder({ page }).analyze();
       const seriousOrCritical = results.violations.filter(
         (violation) => violation.impact === 'serious' || violation.impact === 'critical',

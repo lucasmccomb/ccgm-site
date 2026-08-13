@@ -39,6 +39,7 @@ function safeId(value: string): string {
       files.map((file) => {
         const inlined = inlinedPaths.has(file.path);
         const domId = `file-${safeId(moduleName)}-${safeId(file.path)}`;
+        const headingId = `${domId}-heading`;
         const copyIdleLabel = file.isMergeFragment ? MERGE_FRAGMENT_COPY_LABEL : undefined;
 
         return (
@@ -50,19 +51,28 @@ function safeId(value: string): string {
             data-file-placeholder={file.hasSubstitutionPlaceholders ? 'true' : 'false'}
             data-file-inlined={inlined ? 'true' : 'false'}
           >
-            <h4 class="file-entry__path">{file.path}</h4>
+            <h4 class="file-entry__path" id={headingId}>{file.path}</h4>
             {file.isMergeFragment && <p data-merge-annotation>{MERGE_FRAGMENT_ANNOTATION}</p>}
             {file.hasSubstitutionPlaceholders && <p data-placeholder-annotation>{PLACEHOLDER_ANNOTATION}</p>}
             {inlined ? (
               <Fragment>
                 {/* No whitespace/newlines between the tags and the expression below --
-                    <pre> preserves it literally, which would corrupt the byte-exact copy. */}
-                <pre id={domId} class="file-entry__body">{file.content}</pre>
+                    <pre> preserves it literally, which would corrupt the byte-exact copy.
+                    tabindex="0" + aria-labelledby: this <pre> scrolls (overflow-x on long
+                    lines, overflow-y past max-height) and must be keyboard/AT reachable
+                    (WCAG 2.1.1, axe scrollable-region-focusable) -- same fix as the
+                    README-rendered <pre> in [name].astro. */}
+                <pre id={domId} tabindex="0" aria-labelledby={headingId} class="file-entry__body">{file.content}</pre>
                 <CopyButton targetId={domId} label={file.path} idleLabel={copyIdleLabel} />
               </Fragment>
             ) : (
               <Fragment>
-                <pre class="file-entry__body file-entry__body--preview" data-file-preview>{previewOf(file.content)}</pre>
+                <pre
+                  tabindex="0"
+                  aria-labelledby={headingId}
+                  class="file-entry__body file-entry__body--preview"
+                  data-file-preview
+                >{previewOf(file.content)}</pre>
                 <p>
                   <a href={file.rawUrl} data-file-raw-link>
                     View raw ({file.bytes} bytes)

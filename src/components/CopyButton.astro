@@ -3,13 +3,23 @@
  * The one shared copy component every copy surface on the site uses
  * (§1.4 governing context: "one shared CopyButton for every copy surface").
  *
- * Copies the exact textContent of the element with id={targetId}. Announces
- * state changes via an aria-live region and only shows "copied" after the
- * clipboard promise resolves; a rejected promise shows an inline error.
+ * Two mutually exclusive modes, chosen by which prop is passed:
+ *  - `targetId` (the original mode): copies the exact textContent of the
+ *    element with that id. Synchronous, no network.
+ *  - `sourceUrl` (§5 E5): fetches that URL at click time and copies the
+ *    response body. Used for files the page deliberately does not inline
+ *    into the DOM (over the 250 KB page / 64 KB per-file budget, §3.4) --
+ *    this keeps a byte-exact copy available without bloating page weight.
+ *
+ * Either way: announces state changes via an aria-live region and only
+ * shows "copied" after the copy resolves; a rejected promise or failed
+ * fetch shows an inline error.
  */
 interface Props {
-  /** id of the element whose textContent gets copied verbatim. */
-  targetId: string;
+  /** id of the element whose textContent gets copied verbatim. Mutually exclusive with sourceUrl. */
+  targetId?: string;
+  /** URL fetched at click time; its response body is copied verbatim. Mutually exclusive with targetId. */
+  sourceUrl?: string;
   /** Human-readable name of what is being copied, used to build aria-label. */
   label: string;
   idleLabel?: string;
@@ -19,19 +29,29 @@ interface Props {
 
 const {
   targetId,
+  sourceUrl,
   label,
   idleLabel = 'Copy',
   copiedLabel = 'Copied',
   class: className = '',
 } = Astro.props;
 
-const liveId = `${targetId}-copy-live`;
+if (!targetId && !sourceUrl) {
+  throw new Error('CopyButton requires either targetId or sourceUrl');
+}
+
+// sourceUrl-mode ids are derived from the URL, which may contain slashes and
+// dots -- sanitize to a safe id token so the element stays uniquely and
+// validly addressable per file.
+const idBase = (targetId ?? sourceUrl ?? '').replace(/[^a-zA-Z0-9_-]/g, '-');
+const liveId = `copy-live-${idBase}`;
 ---
 
 <button
   type="button"
   data-copy-button
   data-copy-target={targetId}
+  data-copy-source={sourceUrl}
   data-copy-live={liveId}
   data-idle-label={idleLabel}
   data-copied-label={copiedLabel}

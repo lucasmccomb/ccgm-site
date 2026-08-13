@@ -1,0 +1,352 @@
+---
+/**
+ * Module detail page (§5 E5). Renders every field on ModuleRecord: README,
+ * "Will install" inventory, dependencies + reverse "required by",
+ * configPrompts, postInstall callout, preset membership, tags, source
+ * link, the three-option install strip, and every text-based contentFiles
+ * entry grouped by type with a per-file CopyButton -- respecting the
+ * 250 KB / 64 KB page-level inline budget (§3.4's fill rule,
+ * src/lib/inline-budget.ts).
+ *
+ * Three load-bearing treatments (not decoration): merge fragments,
+ * installer-substitution placeholders, and status: 'deprecated'. See
+ * src/lib/modulepagecopy.ts and src/components/ModuleFileSection.astro.
+ */
+import type { GetStaticPaths } from 'astro';
+import Base from '../../layouts/Base.astro';
+import CopyButton from '../../components/CopyButton.astro';
+import ModuleFileSection from '../../components/ModuleFileSection.astro';
+import ModuleInstallStrip from '../../components/ModuleInstallStrip.astro';
+import { buildModuleBundle } from '../../lib/module-bundle.ts';
+import { loadModulesIndex } from '../../lib/generated.ts';
+import { computeInlineBudget } from '../../lib/inline-budget.ts';
+import { renderMarkdownToHtml } from '../../lib/markdown.ts';
+import {
+  CONFIG_PROMPTS_HEADING,
+  DEPENDENCIES_HEADING,
+  DEPRECATED_BANNER_HEADING,
+  DEPRECATED_BANNER_TEXT,
+  DEPRECATED_INSTALL_SUMMARY,
+  FILES_HEADING,
+  INSTALL_STRIP_HEADING,
+  NO_DEPENDENCIES_TEXT,
+  NO_PRESETS_TEXT,
+  NO_REQUIRED_BY_TEXT,
+  POST_INSTALL_HEADING,
+  PRESETS_HEADING,
+  README_HEADING,
+  REQUIRED_BY_HEADING,
+  SOURCE_LINK_LABEL,
+  TAGS_HEADING,
+  WILL_INSTALL_ACTION_COLUMN,
+  WILL_INSTALL_COPY_ACTION,
+  WILL_INSTALL_HEADING,
+  WILL_INSTALL_MERGE_ACTION,
+  WILL_INSTALL_PATH_COLUMN,
+  WILL_INSTALL_TARGET_COLUMN,
+  WILL_INSTALL_TYPE_COLUMN,
+  contextCostBadgeText,
+  formatLastUpdated,
+  postInstallCalloutText,
+  remainderNoteText,
+} from '../../lib/modulepagecopy.ts';
+import { SITE_URL } from '../../lib/site.ts';
+import { FILE_TYPE_BUCKETS } from '../../lib/schema.ts';
+
+export const getStaticPaths: GetStaticPaths = () => {
+  const { modules } = loadModulesIndex();
+  return modules.map((mod) => ({ params: { name: mod.name } }));
+};
+
+const { name } = Astro.params;
+const { meta, modules } = loadModulesIndex();
+const mod = modules.find((m) => m.name === name);
+if (!mod) {
+  throw new Error(`modules/[name].astro: no module record for "${name}" -- getStaticPaths and this lookup have drifted`);
+}
+
+const isDeprecated = mod.status === 'deprecated';
+
+const dependents = modules
+  .filter((m) => m.dependencies.includes(mod.name))
+  .map((m) => m.name)
+  .sort((a, b) => a.localeCompare(b));
+
+// markdown-it's fenced code blocks render as a plain, scrollable <pre> with
+// no keyboard access of its own (axe: scrollable-region-focusable) -- a
+// real WCAG failure once a README with a code fence is actually rendered
+// (§1.4 principle 7: in-scope-now, not polish). Fixed here, not in
+// markdown.ts's renderer (out of E5's scope to touch) -- a page-local
+// post-process of the renderer's OUTPUT, adding keyboard focusability to
+// every <pre> this page renders from README markdown.
+const readmeHtml = mod.readmeMd ? renderMarkdownToHtml(mod.readmeMd).replace(/<pre(?![^>]*\btabindex=)/g, '<pre tabindex="0"') : '';
+
+const inlineBudget = computeInlineBudget(mod.contentFiles);
+const inlinedPaths = new Set(inlineBudget.items.filter((item) => item.inlined).map((item) => item.file.path));
+
+const groupedFiles = FILE_TYPE_BUCKETS.map((type) => ({
+  type,
+  files: mod.contentFiles.filter((file) => file.type === type),
+})).filter((group) => group.files.length > 0);
+
+const bundle = buildModuleBundle(mod, SITE_URL, meta.sourceSha);
+const bundleUrl = `/modules/${mod.name}/bundle.md`;
+---
+
+<Base
+  title={`${mod.displayName} -- CCGM`}
+  description={mod.summary}
+>
+  <article>
+    <header class="module-header">
+      <h1>{mod.displayName}</h1>
+      <div class="module-header__badges">
+        <span class="module-header__badge" data-category-badge>{mod.category}</span>
+        {mod.status && (
+          <span class="module-header__badge module-header__badge--status" data-status-badge={mod.status}>
+            {mod.status}
+          </span>
+        )}
+        <span class="module-header__badge" data-cost-badge>{contextCostBadgeText(mod.contextCostTokens)}</span>
+        <span class="module-header__badge" data-last-updated>updated {formatLastUpdated(mod.lastUpdated)}</span>
+      </div>
+    </header>
+
+    {isDeprecated && (
+      <div class="deprecated-banner" role="note" data-deprecated-banner>
+        <h2>{DEPRECATED_BANNER_HEADING}</h2>
+        <p>{DEPRECATED_BANNER_TEXT}</p>
+      </div>
+    )}
+
+    <p class="module-description" data-module-description>{mod.description}</p>
+
+    {mod.tags.length > 0 && (
+      <section aria-labelledby="tags-heading">
+        <h2 id="tags-heading">{TAGS_HEADING}</h2>
+        <ul class="tag-list" data-tags>
+          {mod.tags.map((tag) => <li>{tag}</li>)}
+        </ul>
+      </section>
+    )}
+
+    {readmeHtml && (
+      <section aria-labelledby="readme-heading">
+        <h2 id="readme-heading">{README_HEADING}</h2>
+        <div class="readme" data-readme set:html={readmeHtml} />
+      </section>
+    )}
+
+    <section aria-labelledby="will-install-heading">
+      <h2 id="will-install-heading">{WILL_INSTALL_HEADING}</h2>
+      <table data-will-install-table>
+        <thead>
+          <tr>
+            <th>{WILL_INSTALL_PATH_COLUMN}</th>
+            <th>{WILL_INSTALL_ACTION_COLUMN}</th>
+            <th>{WILL_INSTALL_TARGET_COLUMN}</th>
+            <th>{WILL_INSTALL_TYPE_COLUMN}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {mod.files.map((file) => (
+            <tr data-will-install-row data-file-path={file.path} data-merge={file.merge ? 'true' : 'false'}>
+              <td><code>{file.path}</code></td>
+              <td data-action>{file.merge ? WILL_INSTALL_MERGE_ACTION : WILL_INSTALL_COPY_ACTION}</td>
+              <td><code>{file.target}</code></td>
+              <td>{file.type}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+
+    <section aria-labelledby="dependencies-heading">
+      <h2 id="dependencies-heading">{DEPENDENCIES_HEADING}</h2>
+      {mod.dependencies.length > 0 ? (
+        <ul class="dependency-list" data-dependencies>
+          {mod.dependencies.map((dep) => (
+            <li><a href={`/modules/${dep}`}>{dep}</a></li>
+          ))}
+        </ul>
+      ) : (
+        <p>{NO_DEPENDENCIES_TEXT}</p>
+      )}
+    </section>
+
+    <section aria-labelledby="required-by-heading">
+      <h2 id="required-by-heading">{REQUIRED_BY_HEADING}</h2>
+      {dependents.length > 0 ? (
+        <ul class="dependency-list" data-required-by>
+          {dependents.map((dep) => (
+            <li><a href={`/modules/${dep}`}>{dep}</a></li>
+          ))}
+        </ul>
+      ) : (
+        <p>{NO_REQUIRED_BY_TEXT}</p>
+      )}
+    </section>
+
+    {mod.configPrompts.length > 0 && (
+      <section aria-labelledby="config-prompts-heading">
+        <h2 id="config-prompts-heading">{CONFIG_PROMPTS_HEADING}</h2>
+        <ul class="config-prompt-list" data-config-prompts>
+          {mod.configPrompts.map((prompt) => (
+            <li data-config-prompt data-config-prompt-key={prompt.key}>
+              <p>{prompt.prompt}</p>
+              {prompt.default !== undefined && <p>Default: <code>{prompt.default}</code></p>}
+              {prompt.options && prompt.options.length > 0 && (
+                <p>Options: {prompt.options.map((option) => <code>{option}</code>)}</p>
+              )}
+            </li>
+          ))}
+        </ul>
+      </section>
+    )}
+
+    <section aria-labelledby="presets-heading">
+      <h2 id="presets-heading">{PRESETS_HEADING}</h2>
+      {mod.presets.length > 0 ? (
+        <ul class="preset-badge-list" data-preset-badges>
+          {mod.presets.map((preset) => <li><a href="/install">{preset}</a></li>)}
+        </ul>
+      ) : (
+        <p>{NO_PRESETS_TEXT}</p>
+      )}
+    </section>
+
+    {mod.postInstall && (
+      <section aria-labelledby="post-install-heading" data-post-install-callout>
+        <h2 id="post-install-heading">{POST_INSTALL_HEADING}</h2>
+        <p>{postInstallCalloutText(mod.postInstall)}</p>
+        {mod.postInstallFile && (
+          <>
+            <pre id="post-install-body" class="command-block">{mod.postInstallFile.content}</pre>
+            <CopyButton targetId="post-install-body" label={`the ${mod.postInstall} follow-up script`} />
+            <p><a href={mod.postInstallFile.rawUrl} data-post-install-raw-link>View raw</a></p>
+          </>
+        )}
+      </section>
+    )}
+
+    <section aria-labelledby="install-strip-heading">
+      <h2 id="install-strip-heading">{INSTALL_STRIP_HEADING}</h2>
+      {isDeprecated ? (
+        <details data-install-strip-gate>
+          <summary>{DEPRECATED_INSTALL_SUMMARY}</summary>
+          <ModuleInstallStrip module={mod} />
+        </details>
+      ) : (
+        <ModuleInstallStrip module={mod} />
+      )}
+    </section>
+
+    <section aria-labelledby="files-heading" id="files">
+      <h2 id="files-heading">{FILES_HEADING}</h2>
+
+      {inlineBudget.remainderCount > 0 && (
+        <p data-remainder-note>{remainderNoteText(inlineBudget.remainderCount)}</p>
+      )}
+
+      <p>
+        <CopyButton sourceUrl={bundleUrl} label={`the entire ${mod.displayName} module as markdown`} idleLabel={bundle.label} class="copy-entire-module" />
+      </p>
+
+      {groupedFiles.map((group) => (
+        <ModuleFileSection type={group.type} files={group.files} inlinedPaths={inlinedPaths} moduleName={mod.name} />
+      ))}
+    </section>
+
+    <p class="source-link">
+      <a href={mod.sourceUrl} data-source-link>{SOURCE_LINK_LABEL}</a>
+    </p>
+  </article>
+</Base>
+
+<style>
+  .module-header__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--space-unit) * 0.5);
+    margin-bottom: var(--space-unit);
+  }
+
+  .module-header__badge {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 0 calc(var(--space-unit) * 0.5);
+    font-size: 0.875rem;
+  }
+
+  .module-header__badge--status {
+    border-color: var(--color-accent);
+  }
+
+  .deprecated-banner {
+    border: 1px solid var(--color-accent);
+    border-radius: var(--radius);
+    padding: var(--space-unit);
+    margin-bottom: var(--space-unit);
+  }
+
+  .deprecated-banner h2 {
+    margin-top: 0;
+  }
+
+  table[data-will-install-table] {
+    width: 100%;
+    border-collapse: collapse;
+    margin: var(--space-unit) 0;
+  }
+
+  table[data-will-install-table] th,
+  table[data-will-install-table] td {
+    border: 1px solid var(--color-border);
+    padding: calc(var(--space-unit) * 0.5) var(--space-unit);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .tag-list,
+  .dependency-list,
+  .preset-badge-list,
+  .config-prompt-list {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--space-unit) * 0.5);
+  }
+
+  .config-prompt-list {
+    flex-direction: column;
+  }
+
+  .config-prompt-list > li {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: var(--space-unit);
+  }
+
+  .tag-list li,
+  .preset-badge-list li {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 0 calc(var(--space-unit) * 0.5);
+  }
+
+  .readme {
+    max-width: var(--measure);
+  }
+
+  .command-block {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: var(--space-unit);
+    font-family: var(--font-mono);
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+</style>

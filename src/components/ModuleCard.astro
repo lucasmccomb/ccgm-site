@@ -1,0 +1,141 @@
+---
+/**
+ * Catalog card (§5 E5): name, summary, category, status badge,
+ * context-cost badge, last-updated, inventory glyphs. Renders `summary`
+ * (the ≤120-char derived form) -- never the raw `description`, which
+ * exceeds 120 chars for 74 of 78 modules (§3.3).
+ *
+ * Carries data-module-card/data-category/data-tags so the catalog page's
+ * tag-filter script (src/scripts/module-filter.ts) can find and filter
+ * cards without any framework -- a plain, fully-populated list without
+ * JavaScript is the baseline; the filter is progressive enhancement.
+ */
+import type { ModuleRecord } from '../lib/schema.ts';
+import {
+  contextCostBadgeText,
+  formatLastUpdated,
+  inventoryGlyph,
+  inventoryItemLabel,
+} from '../lib/modulepagecopy.ts';
+
+interface Props {
+  module: ModuleRecord;
+}
+
+const { module: mod } = Astro.props;
+
+const inventoryEntries = Object.entries(mod.inventory)
+  .filter(([, count]) => count > 0)
+  .sort(([a], [b]) => a.localeCompare(b));
+---
+
+<article
+  class="module-card"
+  data-module-card
+  data-module-name={mod.name}
+  data-category={mod.category}
+  data-tags={mod.tags.join(',')}
+>
+  <h3 class="module-card__name">
+    <a href={`/modules/${mod.name}`}>{mod.displayName}</a>
+  </h3>
+
+  <p class="module-card__summary">{mod.summary}</p>
+
+  <div class="module-card__badges">
+    <span class="module-card__badge" data-category-badge>{mod.category}</span>
+    {mod.status && (
+      <span class="module-card__badge module-card__badge--status" data-status-badge={mod.status}>
+        {mod.status}
+      </span>
+    )}
+    <span class="module-card__badge" data-cost-badge>
+      {contextCostBadgeText(mod.contextCostTokens)}
+    </span>
+    <span class="module-card__badge" data-last-updated>
+      updated {formatLastUpdated(mod.lastUpdated)}
+    </span>
+  </div>
+
+  <ul class="module-card__inventory" data-inventory aria-label={`File types in ${mod.displayName}`}>
+    {
+      inventoryEntries.map(([type, count]) => (
+        <li title={inventoryItemLabel(type, count)}>
+          <span aria-hidden="true">{inventoryGlyph(type)}</span>
+          <span class="sr-only">{inventoryItemLabel(type, count)}</span>
+          <span aria-hidden="true">{count}</span>
+        </li>
+      ))
+    }
+  </ul>
+</article>
+
+<style>
+  .module-card {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: var(--space-unit);
+    background: var(--color-surface-1);
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--space-unit) * 0.5);
+  }
+
+  .module-card__name {
+    margin: 0;
+    font-family: var(--font-mono);
+  }
+
+  .module-card__name a {
+    color: var(--color-fg);
+    text-decoration: none;
+  }
+
+  .module-card__name a:hover,
+  .module-card__name a:focus-visible {
+    text-decoration: underline;
+  }
+
+  .module-card__summary {
+    margin: 0;
+    color: var(--color-fg);
+  }
+
+  .module-card__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--space-unit) * 0.5);
+  }
+
+  .module-card__badge {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 0 calc(var(--space-unit) * 0.5);
+    font-size: 0.8125rem;
+    color: var(--color-fg);
+  }
+
+  .module-card__badge--status {
+    border-color: var(--color-accent);
+  }
+
+  .module-card__inventory {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--space-unit) * 0.5);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--color-fg);
+  }
+
+  .module-card__inventory li {
+    display: inline-flex;
+    gap: 0.25em;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 0 calc(var(--space-unit) * 0.375);
+  }
+</style>

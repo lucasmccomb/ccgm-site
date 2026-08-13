@@ -14,6 +14,7 @@
     "gen:headers": "tsx scripts/gen-headers.ts",
     "census:check": "tsx scripts/census-check.ts",
     "census:update": "tsx scripts/census-update.ts",
+    "nightly:check": "tsx scripts/nightly-check.ts",
     "dev": "astro dev",
     "build": "pnpm fonts:sync && pnpm ingest && pnpm banner && astro build && pnpm gen:headers && pagefind --site dist",
     "test": "vitest run",

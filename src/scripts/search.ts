@@ -210,6 +210,10 @@ export function initSearch(): void {
 
   input.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
+    // Invalidate any in-flight query so a late resolution cannot repopulate
+    // the results the user just dismissed (same token the runSearch guard uses).
+    latestRequestId++;
+    window.clearTimeout(debounceHandle);
     input.value = '';
     list.hidden = true;
     list.textContent = '';

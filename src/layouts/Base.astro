@@ -5,16 +5,21 @@
  * Authored once in E1 and not edited again in wave 2 (§7.4): E2 fills
  * SourceStamp.astro (footer SHA stamp) and E3 fills ThemeInit.astro (theme
  * review-override script), both already mounted below. E6 (wave 3) is the
- * only later epic allowed to edit this file, for search + global chrome.
+ * only later epic allowed to edit this file, for search + global chrome:
+ * the skip link, the header Search island, the pagefind indexing scope
+ * (data-pagefind-body on <main>, data-pagefind-ignore on header/footer),
+ * and the footer's "view as Markdown" link.
  *
  * <html data-theme> is rendered statically from DEFAULT_THEME so the shipped
  * look survives with JavaScript disabled -- ThemeInit is progressive
  * enhancement layered on top, never a requirement for a themed page.
  */
 import '../styles/global.css';
+import Search from '../components/Search.astro';
 import SourceStamp from '../components/SourceStamp.astro';
 import ThemeInit from '../components/ThemeInit.astro';
 import { DEFAULT_THEME } from '../lib/site.ts';
+import { mdTwinUrlFor } from '../lib/mdtwin.ts';
 
 interface Props {
   title: string;
@@ -22,6 +27,12 @@ interface Props {
 }
 
 const { title, description } = Astro.props;
+
+// Derived from the route being rendered, not threaded through every page
+// as a prop -- every HTML page on the site uses this one layout, so this
+// is the single place the "view as Markdown" link needs to exist. null
+// (a page with no twin, e.g. 404) omits the link entirely.
+const twinUrl = mdTwinUrlFor(Astro.url.pathname);
 ---
 
 <html lang="en" data-theme={DEFAULT_THEME}>
@@ -34,24 +45,46 @@ const { title, description } = Astro.props;
     <slot name="head" />
   </head>
   <body>
-    <header class="site-header">
+    <a href="#main-content" class="skip-link">Skip to content</a>
+
+    <header class="site-header" data-pagefind-ignore>
       <nav aria-label="Primary">
         <a href="/" class="site-header__brand">CCGM</a>
       </nav>
+      <Search />
     </header>
 
-    <main>
+    <main id="main-content" tabindex="-1" data-pagefind-body>
       <slot />
     </main>
 
-    <footer class="site-footer">
+    <footer class="site-footer" data-pagefind-ignore>
       <SourceStamp />
       <a href="https://github.com/lucasmccomb/ccgm">github.com/lucasmccomb/ccgm</a>
+      {twinUrl && (
+        <a href={twinUrl} data-view-as-markdown>View as Markdown</a>
+      )}
     </footer>
   </body>
 </html>
 
 <style>
+  .skip-link {
+    position: absolute;
+    top: -3rem;
+    left: var(--space-unit);
+    z-index: 10;
+    background: var(--color-bg);
+    color: var(--color-fg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: calc(var(--space-unit) * 0.5) var(--space-unit);
+  }
+
+  .skip-link:focus {
+    top: var(--space-unit);
+  }
+
   .site-header,
   .site-footer {
     padding: var(--space-unit) calc(var(--space-unit) * 2);
@@ -60,11 +93,17 @@ const { title, description } = Astro.props;
 
   .site-header {
     border-bottom: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--space-unit);
   }
 
   .site-footer {
     border-top: 1px solid var(--color-border);
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-unit);
     font-size: 0.875rem;
     color: var(--color-fg);

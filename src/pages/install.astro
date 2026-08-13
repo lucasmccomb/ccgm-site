@@ -7,6 +7,12 @@
  * description column only appears once at least one preset carries a
  * non-null description (today: none do, since ccgm's
  * docs/preset-descriptions.json has not merged yet -- see E2 scope).
+ *
+ * Every command <pre> carries tabindex="0" (E6 a11y fix): axe's
+ * scrollable-region-focusable rule fires whenever one of these overflows
+ * horizontally, which the longer commands do in the ascii/serif themes --
+ * same fix as [name].astro's README render and ModuleFileSection.astro's
+ * file bodies use for the identical reason.
  */
 import Base from '../layouts/Base.astro';
 import CommandTabs from '../components/CommandTabs.astro';
@@ -47,11 +53,11 @@ const hasAnyDescription = presets.some((preset) => preset.description !== null);
     <Fragment slot="bash">
       <p>{BASH_TAB_INTRO}</p>
 
-      <pre id="install-command-bash" class="command-block">{INSTALL_COMMAND}</pre>
+      <pre id="install-command-bash" tabindex="0" class="command-block">{INSTALL_COMMAND}</pre>
       <CopyButton targetId="install-command-bash" label="the bash install command" />
 
       <p>{BASH_TAB_NONINTERACTIVE_INTRO}</p>
-      <pre id="install-command-noninteractive" class="command-block">{INSTALL_COMMAND_NONINTERACTIVE}</pre>
+      <pre id="install-command-noninteractive" tabindex="0" class="command-block">{INSTALL_COMMAND_NONINTERACTIVE}</pre>
       <CopyButton targetId="install-command-noninteractive" label="the non-interactive install command" />
 
       <h2>Presets</h2>
@@ -95,17 +101,17 @@ const hasAnyDescription = presets.some((preset) => preset.description !== null);
 
     <Fragment slot="agent">
       <p>{AGENT_TAB_INTRO}</p>
-      <pre id="install-command-agent" class="command-block">{AGENT_PASTE_BLOCK}</pre>
+      <pre id="install-command-agent" tabindex="0" class="command-block">{AGENT_PASTE_BLOCK}</pre>
       <CopyButton targetId="install-command-agent" label="the agent-paste install block" />
     </Fragment>
 
     <Fragment slot="marketplace">
       <p>{MARKETPLACE_TAB_INTRO}</p>
 
-      <pre id="install-command-marketplace" class="command-block">{MARKETPLACE_ADD_COMMAND}</pre>
+      <pre id="install-command-marketplace" tabindex="0" class="command-block">{MARKETPLACE_ADD_COMMAND}</pre>
       <CopyButton targetId="install-command-marketplace" label="the marketplace add command" />
 
-      <pre id="install-command-marketplace-example" class="command-block">{MARKETPLACE_INSTALL_EXAMPLE_COMMAND}</pre>
+      <pre id="install-command-marketplace-example" tabindex="0" class="command-block">{MARKETPLACE_INSTALL_EXAMPLE_COMMAND}</pre>
       <CopyButton
         targetId="install-command-marketplace-example"
         label="the marketplace install-a-module example command"

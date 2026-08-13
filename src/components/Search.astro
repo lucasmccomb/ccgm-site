@@ -1,0 +1,109 @@
+---
+/**
+ * Header search island (§5 E6). Pagefind's low-level JS API
+ * (`/pagefind/pagefind.js`, not the packaged PagefindUI widget) is used so
+ * result rendering stays plain DOM + this site's own semantic-token styling
+ * -- no separate pagefind-ui.css to load, and full control over how a
+ * result excerpt reaches innerHTML (src/lib/search-sanitize.ts,
+ * src/scripts/search.ts).
+ *
+ * Progressive enhancement: without JavaScript this is a plain, harmless
+ * <input type="search"> that submits nowhere and does nothing -- category
+ * browse (E5's /modules catalog) is the primary discovery surface; this is
+ * a supplementary shortcut.
+ *
+ * data-pagefind-ignore: this is chrome, not content -- mounted once in
+ * Base.astro's header on every page, so without this the search box's own
+ * label/placeholder text would appear in its own result set on every page.
+ */
+---
+
+<div class="site-search" data-search data-pagefind-ignore>
+  <label for="site-search-input" class="sr-only">Search modules</label>
+  <input
+    type="search"
+    id="site-search-input"
+    name="q"
+    data-search-input
+    placeholder="Search modules… (press /)"
+    autocomplete="off"
+    aria-describedby="site-search-status"
+  />
+  <p id="site-search-status" class="sr-only" role="status" aria-live="polite" data-search-status></p>
+  <ul class="site-search__results" data-search-results hidden></ul>
+</div>
+
+<script>
+  import '../scripts/search.ts';
+</script>
+
+<style>
+  .site-search {
+    position: relative;
+  }
+
+  .site-search input[type='search'] {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface-1);
+    color: var(--color-fg);
+    padding: calc(var(--space-unit) * 0.5) var(--space-unit);
+    font: inherit;
+    min-width: 12rem;
+    max-width: 100%;
+  }
+
+  .site-search__results {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    z-index: 1;
+    list-style: none;
+    margin: calc(var(--space-unit) * 0.5) 0 0 0;
+    padding: calc(var(--space-unit) * 0.5);
+    width: min(24rem, 90vw);
+    max-height: 24rem;
+    overflow-y: auto;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+  }
+
+  .site-search__results:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-unit);
+  }
+
+  /*
+   * :global -- these elements are created client-side by
+   * src/scripts/search.ts's document.createElement calls, not present in
+   * this component's server-rendered markup, so Astro's scoped-style
+   * data-attribute is never applied to them.
+   */
+  :global(.site-search__result) {
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: var(--space-unit);
+  }
+
+  :global(.site-search__result:last-child) {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  :global(.site-search__result a) {
+    font-weight: 600;
+  }
+
+  :global(.site-search__excerpt) {
+    margin: calc(var(--space-unit) * 0.25) 0 0 0;
+    font-size: 0.875rem;
+    color: var(--color-fg);
+    opacity: 0.85;
+  }
+
+  :global(.site-search__excerpt mark) {
+    background: var(--color-accent);
+    color: var(--color-bg);
+  }
+</style>

@@ -49,7 +49,7 @@ describe('findInlineScriptHash', () => {
     if (tempDir) rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it('returns null when there are zero inline scripts (E1 -- ThemeInit is a placeholder)', () => {
+  it('returns null when there are zero inline scripts (defensive path -- ThemeInit.astro has shipped the real ?theme= override script since E3)', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'ccgm-site-headers-'));
     writeFileSync(join(tempDir, 'index.html'), '<html><body>no scripts here</body></html>');
     expect(findInlineScriptHash(tempDir)).toBeNull();

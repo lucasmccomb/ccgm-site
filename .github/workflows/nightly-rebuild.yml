@@ -65,6 +65,18 @@ jobs:
           # so this checkout only needs ccgm-site's own (shallow) history.
           fetch-depth: 1
 
+      - name: Ensure alert labels exist
+        # gh issue create fails (exit 1, no continue-on-error) on an
+        # unrecognized --label, which would red the whole job on the first
+        # real alert instead of filing the diagnostic issue. --force makes
+        # this idempotent -- safe to run every time regardless of whether
+        # the labels already exist.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create ingest-drift -R lucasmccomb/ccgm-site --color d93f0b --description "Nightly rebuild: content pipeline failure or census drift" --force || true
+          gh label create deploy-stale -R lucasmccomb/ccgm-site --color d93f0b --description "Nightly rebuild: deploy did not verify against the live site" --force || true
+
       - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4

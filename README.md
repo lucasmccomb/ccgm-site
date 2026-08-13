@@ -8,7 +8,7 @@ Astro 5 static site, Tailwind v4, content generated from the
 
 ```bash
 pnpm install
-pnpm build      # fonts:sync -> ingest -> astro build -> gen:headers -> pagefind
+pnpm build      # fonts:sync -> ingest -> banner -> astro build -> gen:headers -> pagefind
 pnpm test       # vitest, run after a build (several tests read dist/)
 pnpm test:e2e   # playwright, against the built dist/ output
 pnpm dev        # local dev server (astro dev)
@@ -88,6 +88,7 @@ real transformation the site performs, not a property of the source data.
 ```
 pnpm fonts:sync   # sync self-hosted webfonts from @fontsource* into public/fonts/
 pnpm ingest       # parse ccgm's modules into src/generated/
+pnpm banner       # generate the landing page's ASCII hero banner into src/generated/
 astro build       # emit dist/
 pnpm gen:headers  # write dist/_headers from the BUILT output (see below)
 pagefind --site dist   # build the search index

@@ -27,10 +27,10 @@ resolve_status() {
   local url="$1"
   local path
   path="$(printf '%s' "$url" | sed -E 's#^https?://[^/]+##')"
-  curl -o /dev/null -s -w '%{http_code}' "$BASE_URL$path"
+  curl -o /dev/null -s -w '%{http_code}' --connect-timeout 5 --max-time 15 "$BASE_URL$path"
 }
 
-LLMS_TXT="$(curl -fsS "$BASE_URL/llms.txt")" || {
+LLMS_TXT="$(curl -fsS --connect-timeout 5 --max-time 15 "$BASE_URL/llms.txt")" || {
   echo "verify-links: FAIL -- could not fetch $BASE_URL/llms.txt" >&2
   exit 1
 }
@@ -60,7 +60,7 @@ echo "verify-links: checked $CHECKED URL(s) referenced from $BASE_URL/llms.txt"
 
 # Discovery headers on / also carry absolute URLs (X-Llms-Txt, and the
 # Link: <...>; rel="llms-txt" header) -- their paths must resolve too.
-RESPONSE_HEADERS="$(curl -sS -D - -o /dev/null "$BASE_URL/")"
+RESPONSE_HEADERS="$(curl -sS --connect-timeout 5 --max-time 15 -D - -o /dev/null "$BASE_URL/")"
 
 get_header() {
   printf '%s\n' "$RESPONSE_HEADERS" | grep -i "^${1}:" | head -1 | cut -d':' -f2- | tr -d '\r' | sed 's/^ //'

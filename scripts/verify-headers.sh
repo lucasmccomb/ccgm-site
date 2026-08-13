@@ -40,7 +40,7 @@ assert_contains_in() {
   fi
 }
 
-response_headers="$(curl -sS -D - -o /dev/null "$BASE_URL/")" || fail "curl request to $BASE_URL/ failed"
+response_headers="$(curl -sS --connect-timeout 5 --max-time 15 -D - -o /dev/null "$BASE_URL/")" || fail "curl request to $BASE_URL/ failed"
 get_header() { get_header_from "$response_headers" "$1"; }
 assert_contains() { assert_contains_in "$response_headers" "/" "$1" "$2"; }
 
@@ -54,25 +54,25 @@ assert_contains "link" "rel=\"llms-txt\""
 
 # --- Machine-surface content types (§3.4) --------------------------------
 
-llms_txt_headers="$(curl -sS -D - -o /dev/null "$BASE_URL/llms.txt")" || fail "curl request to $BASE_URL/llms.txt failed"
+llms_txt_headers="$(curl -sS --connect-timeout 5 --max-time 15 -D - -o /dev/null "$BASE_URL/llms.txt")" || fail "curl request to $BASE_URL/llms.txt failed"
 assert_contains_in "$llms_txt_headers" "/llms.txt" "content-type" "text/plain"
 
-llms_full_headers="$(curl -sS -D - -o /dev/null "$BASE_URL/llms-full.txt")" || fail "curl request to $BASE_URL/llms-full.txt failed"
+llms_full_headers="$(curl -sS --connect-timeout 5 --max-time 15 -D - -o /dev/null "$BASE_URL/llms-full.txt")" || fail "curl request to $BASE_URL/llms-full.txt failed"
 assert_contains_in "$llms_full_headers" "/llms-full.txt" "content-type" "text/plain"
 
-md_twin_headers="$(curl -sS -D - -o /dev/null "$BASE_URL/modules/index.md")" || fail "curl request to $BASE_URL/modules/index.md failed"
+md_twin_headers="$(curl -sS --connect-timeout 5 --max-time 15 -D - -o /dev/null "$BASE_URL/modules/index.md")" || fail "curl request to $BASE_URL/modules/index.md failed"
 assert_contains_in "$md_twin_headers" "/modules/index.md" "content-type" "text/markdown"
 assert_contains_in "$md_twin_headers" "/modules/index.md" "x-robots-tag" "noindex"
 
-modules_json_headers="$(curl -sS -D - -o /dev/null "$BASE_URL/modules.json")" || fail "curl request to $BASE_URL/modules.json failed"
+modules_json_headers="$(curl -sS --connect-timeout 5 --max-time 15 -D - -o /dev/null "$BASE_URL/modules.json")" || fail "curl request to $BASE_URL/modules.json failed"
 assert_contains_in "$modules_json_headers" "/modules.json" "content-type" "application/json"
 
-presets_json_headers="$(curl -sS -D - -o /dev/null "$BASE_URL/presets.json")" || fail "curl request to $BASE_URL/presets.json failed"
+presets_json_headers="$(curl -sS --connect-timeout 5 --max-time 15 -D - -o /dev/null "$BASE_URL/presets.json")" || fail "curl request to $BASE_URL/presets.json failed"
 assert_contains_in "$presets_json_headers" "/presets.json" "content-type" "application/json"
 
 # Raw per-file endpoint: discovered from /modules.json rather than
 # hardcoded, so this keeps working as the module set changes.
-modules_json_body="$(curl -fsS "$BASE_URL/modules.json")" || fail "curl request to $BASE_URL/modules.json (body) failed"
+modules_json_body="$(curl -fsS --connect-timeout 5 --max-time 15 "$BASE_URL/modules.json")" || fail "curl request to $BASE_URL/modules.json (body) failed"
 raw_url="$(printf '%s' "$modules_json_body" | python3 -c '
 import json, sys
 data = json.load(sys.stdin)
@@ -86,7 +86,7 @@ if [ -z "$raw_url" ]; then
   fail "could not find any module file rawUrl in $BASE_URL/modules.json"
 fi
 raw_path="$(printf '%s' "$raw_url" | sed -E 's#^https?://[^/]+##')"
-raw_file_headers="$(curl -sS -D - -o /dev/null "$BASE_URL$raw_path")" || fail "curl request to $BASE_URL$raw_path failed"
+raw_file_headers="$(curl -sS --connect-timeout 5 --max-time 15 -D - -o /dev/null "$BASE_URL$raw_path")" || fail "curl request to $BASE_URL$raw_path failed"
 assert_contains_in "$raw_file_headers" "$raw_path" "content-type" "text/plain"
 
 echo "verify-headers: OK -- $BASE_URL/"

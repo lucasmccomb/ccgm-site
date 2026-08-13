@@ -12,28 +12,42 @@ import { decideStatus, parseCensusDelta } from '../../scripts/nightly-check.ts';
 
 describe('decideStatus', () => {
   it('reports structural_failure when the pipeline itself failed, regardless of census delta', () => {
-    const result = decideStatus(false, ['moduleCount: 78 -> 79']);
+    const result = decideStatus(false, true, ['moduleCount: 78 -> 79']);
     expect(result.status).toBe('structural_failure');
   });
 
   it('reports structural_failure when the pipeline failed and there is no delta either', () => {
-    const result = decideStatus(false, []);
+    const result = decideStatus(false, true, []);
     expect(result.status).toBe('structural_failure');
   });
 
+  it('reports structural_failure when census:check itself crashed, even though the pipeline passed', () => {
+    const result = decideStatus(true, false, []);
+    expect(result.status).not.toBe('clean');
+    expect(result.status).toBe('structural_failure');
+    expect(result.message).toMatch(/census:check/);
+  });
+
+  it('reports structural_failure on a census:check crash regardless of any parsed delta lines', () => {
+    const result = decideStatus(true, false, ['moduleCount: 78 -> 79']);
+    expect(result.status).not.toBe('clean');
+    expect(result.status).toBe('structural_failure');
+    expect(result.message).toMatch(/census:check/);
+  });
+
   it('reports census_delta when the pipeline passed but the census snapshot diverged', () => {
-    const result = decideStatus(true, ['moduleCount: 78 -> 79']);
+    const result = decideStatus(true, true, ['moduleCount: 78 -> 79']);
     expect(result.status).toBe('census_delta');
     expect(result.message).toContain('moduleCount: 78 -> 79');
   });
 
   it('joins multiple delta lines in the reported message', () => {
-    const result = decideStatus(true, ['moduleCount: 78 -> 79', 'presetSizes.standard: 16 -> 17']);
+    const result = decideStatus(true, true, ['moduleCount: 78 -> 79', 'presetSizes.standard: 16 -> 17']);
     expect(result.message).toBe('moduleCount: 78 -> 79\npresetSizes.standard: 16 -> 17');
   });
 
-  it('reports clean when the pipeline passed and there is no census delta', () => {
-    const result = decideStatus(true, []);
+  it('reports clean when the pipeline passed, census:check succeeded, and there is no census delta', () => {
+    const result = decideStatus(true, true, []);
     expect(result.status).toBe('clean');
   });
 });

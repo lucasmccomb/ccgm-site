@@ -46,13 +46,31 @@ export interface NightlyResult {
 
 /**
  * Pure decision function -- no subprocess, no filesystem. Unit-tested
- * directly for all three branches (tests/unit/nightly-check.test.ts).
+ * directly for all three statuses (tests/unit/nightly-check.test.ts).
+ *
+ * censusCheckOk is `pnpm census:check`'s own exit code, separate from
+ * censusDeltaLines: census-check always exits 0 when it *reports* a delta
+ * (§1.4 principle 13 -- content, not breakage), so a nonzero exit means the
+ * script itself crashed (uncaught exception, unparseable src/generated/
+ * output, etc). A crash folds into structural_failure -- the pipeline could
+ * not be trusted, so the nightly must not silently read "no delta" off a
+ * command that never ran to completion and deploy over it.
  */
-export function decideStatus(structuralOk: boolean, censusDeltaLines: string[]): NightlyResult {
+export function decideStatus(
+  structuralOk: boolean,
+  censusCheckOk: boolean,
+  censusDeltaLines: string[],
+): NightlyResult {
   if (!structuralOk) {
     return {
       status: 'structural_failure',
       message: 'ingest/build/unit-test pipeline failed -- rebuild skipped, see the workflow log for the failing step',
+    };
+  }
+  if (!censusCheckOk) {
+    return {
+      status: 'structural_failure',
+      message: 'pnpm census:check crashed (nonzero exit) -- rebuild skipped, see the workflow log for the failing step',
     };
   }
   if (censusDeltaLines.length > 0) {
@@ -79,11 +97,11 @@ function run(command: string, args: string[]): boolean {
   return result.status === 0;
 }
 
-function runCapture(command: string, args: string[]): string {
+function runCapture(command: string, args: string[]): { output: string; ok: boolean } {
   const result = spawnSync(command, args, { encoding: 'utf-8' });
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
   process.stdout.write(output);
-  return output;
+  return { output, ok: result.status === 0 };
 }
 
 function parseRepoDir(argv: string[]): string | null {
@@ -124,14 +142,16 @@ function main(): void {
 
   const structuralOk = runStructuralCheck(repoDir);
 
+  let censusCheckOk = true;
   let censusDeltaLines: string[] = [];
   if (structuralOk) {
     console.log('nightly-check: checking census...');
-    const censusOutput = runCapture('pnpm', ['census:check']);
+    const { output: censusOutput, ok } = runCapture('pnpm', ['census:check']);
+    censusCheckOk = ok;
     censusDeltaLines = parseCensusDelta(censusOutput);
   }
 
-  const result = decideStatus(structuralOk, censusDeltaLines);
+  const result = decideStatus(structuralOk, censusCheckOk, censusDeltaLines);
   console.log(`NIGHTLY_STATUS=${result.status}`);
   writeGithubOutput(result);
 

@@ -87,16 +87,10 @@ test.describe('agents page: content', () => {
  *
  * /llms.txt, /llms-full.txt, /modules.json, /presets.json, and every
  * per-module JSON/Markdown/raw-file endpoint are authored by E2 (content
- * ingestion pipeline), which E4 develops in parallel with and merges after
- * (plan §5 Epic E4 dependency note). The three page-level twins
- * (/index.md, /install.md, /agents.md) are E4's own deliverable, gated on
- * E2's markdown.ts machinery landing first (see the PR description).
- *
- * Each check below is a real assertion once its artifact exists: it
- * fetches the URL, and if the artifact is missing (404) it skips with an
- * explicit reason instead of failing, so this suite stays green on either
- * side of E2's merge without needing to be rewritten -- the URL list and
- * content-type expectations here are already the target state.
+ * ingestion pipeline). The three page-level twins (/index.md, /install.md,
+ * /agents.md) are E4's own deliverable, wired via E2's markdown.ts
+ * machinery. Both have merged, so every documented URL is a hard
+ * assertion -- a 404 here is a real regression, not a pending-merge gap.
  */
 test.describe('agents page: documented URL surface (live fetch)', () => {
   const checks: Array<{ path: string; contentType: RegExp; label: string }> = [
@@ -114,10 +108,6 @@ test.describe('agents page: documented URL surface (live fetch)', () => {
       request,
     }) => {
       const response = await request.get(check.path);
-      test.skip(
-        response.status() === 404,
-        `${check.path} is not wired yet (E2's machine surface or E4's page twins) -- pending merge, see PR description`,
-      );
 
       expect(response.ok()).toBeTruthy();
       expect(response.headers()['content-type'] ?? '').toMatch(check.contentType);
@@ -128,7 +118,7 @@ test.describe('agents page: documented URL surface (live fetch)', () => {
     request,
   }) => {
     const indexResponse = await request.get('/modules.json');
-    test.skip(indexResponse.status() === 404, '/modules.json is not wired yet -- pending E2 merge');
+    expect(indexResponse.ok()).toBeTruthy();
 
     const index = (await indexResponse.json()) as {
       modules: Array<{ name: string; files: Array<{ rawUrl: string }> }>;

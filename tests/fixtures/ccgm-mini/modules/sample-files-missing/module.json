@@ -1,0 +1,10 @@
+{
+  "name": "sample-files-missing",
+  "displayName": "Sample Files-Missing Module",
+  "description": "Valid JSON but the 'files' key is absent (F3): exercises the manifest.files shape guard, which must collect-and-skip this module with a specific reason rather than throwing an unhandled TypeError from Object.entries(undefined).",
+  "category": "core",
+  "scope": ["global"],
+  "dependencies": [],
+  "tags": ["fixture", "malformed"],
+  "configPrompts": []
+}

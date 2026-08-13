@@ -2,7 +2,7 @@
 
 A minimal, deterministic stand-in for the real `lucasmccomb/ccgm` repo,
 used by `scripts/ingest.ts`'s real ingest pipeline (E2) and its unit
-tests. Five module directories and two preset files:
+tests. Six module directories and two preset files:
 
 - `sample-core` / `sample-workflow` / `sample-tech` (E1): the `core`,
   `workflow`, and `tech-specific` categories, a dependency link
@@ -20,6 +20,10 @@ tests. Five module directories and two preset files:
 - `sample-malformed` (E2): a `module.json` with a trailing comma (invalid
   JSON), exercising the collect-and-skip contract -- this module lands in
   `meta.skippedModules`, and every other fixture module still ingests.
+- `sample-files-missing` (F3): syntactically valid JSON whose `files` key
+  is absent -- exercises the manifest-shape guard ahead of
+  `Object.entries(manifest.files)`, landing in `meta.skippedModules` with
+  the exact reason `module.json 'files' is missing or not an object`.
 - `presets/bad-preset.json` (E2): a JSON object, not a bare array --
   exercises the `presets/*.json` structural refusal (never a sixth
   preset).

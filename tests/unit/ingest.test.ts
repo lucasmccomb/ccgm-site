@@ -1,6 +1,9 @@
-import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
-import { buildIndex, type BuildIndexResult } from '../../scripts/ingest.ts';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+import { buildIndex, isSafeToRemoveCloneDir, type BuildIndexResult } from '../../scripts/ingest.ts';
 import type { ModuleRecord } from '../../src/lib/schema.ts';
 
 /**
@@ -39,6 +42,12 @@ describe('ingest over ccgm-mini', () => {
     const malformed = result.index.meta.skippedModules.find((s) => s.name === 'sample-malformed');
     expect(malformed).toBeDefined();
     expect(malformed?.reason).toBeTruthy();
+
+    // F3: syntactically valid JSON whose 'files' key is missing must
+    // collect-and-skip with this exact reason, never throw an unhandled
+    // TypeError from Object.entries(undefined).
+    const filesMissing = result.index.meta.skippedModules.find((s) => s.name === 'sample-files-missing');
+    expect(filesMissing?.reason).toBe("module.json 'files' is missing or not an object");
   });
 
   it('is deterministic apart from injected generatedAt/siteBuiltAt (byte-identical modules array across two runs)', () => {
@@ -218,5 +227,51 @@ describe('ingest over ccgm-mini', () => {
       expect(Array.isArray(mod.files)).toBe(true);
       expect(Array.isArray(mod.contentFiles)).toBe(true);
     }
+  });
+});
+
+describe('isSafeToRemoveCloneDir (F1 -- guard against a CCGM_SRC_DIR typo)', () => {
+  let tempDir: string;
+
+  afterEach(() => {
+    if (tempDir) rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('refuses "/" -- not named .ccgm-src, not empty, and no matching .git', () => {
+    expect(isSafeToRemoveCloneDir('/')).toBe(false);
+  });
+
+  it('refuses a populated directory standing in for a mistyped $HOME', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'ccgm-site-guard-home-'));
+    writeFileSync(join(tempDir, '.zshrc'), 'export PATH=$PATH');
+    mkdirSync(join(tempDir, 'Documents'));
+    expect(isSafeToRemoveCloneDir(tempDir)).toBe(false);
+  });
+
+  it('allows an empty directory -- there is nothing to lose', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'ccgm-site-guard-empty-'));
+    expect(isSafeToRemoveCloneDir(tempDir)).toBe(true);
+  });
+
+  it('allows any directory named .ccgm-src regardless of contents', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'ccgm-site-guard-parent-'));
+    const ccgmSrcDir = join(tempDir, '.ccgm-src');
+    mkdirSync(ccgmSrcDir);
+    writeFileSync(join(ccgmSrcDir, 'stray-file.txt'), 'leftover from a prior run');
+    expect(isSafeToRemoveCloneDir(ccgmSrcDir)).toBe(true);
+  });
+
+  it('allows a directory that already contains a matching ccgm clone', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'ccgm-site-guard-clone-'));
+    spawnSync('git', ['init', '--quiet'], { cwd: tempDir });
+    spawnSync('git', ['remote', 'add', 'origin', 'https://github.com/lucasmccomb/ccgm.git'], { cwd: tempDir });
+    expect(isSafeToRemoveCloneDir(tempDir)).toBe(true);
+  });
+
+  it('refuses a git repo whose origin points somewhere other than ccgm', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'ccgm-site-guard-wrong-origin-'));
+    spawnSync('git', ['init', '--quiet'], { cwd: tempDir });
+    spawnSync('git', ['remote', 'add', 'origin', 'https://github.com/someone-else/not-ccgm.git'], { cwd: tempDir });
+    expect(isSafeToRemoveCloneDir(tempDir)).toBe(false);
   });
 });

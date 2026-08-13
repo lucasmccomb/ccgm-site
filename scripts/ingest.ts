@@ -24,7 +24,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ZodError } from 'zod';
 import { AGENT_NOTICE, rewriteRelativeReferences } from '../src/lib/markdown.ts';
@@ -114,6 +114,31 @@ async function withNetworkRetry<T>(fn: () => T, label: string, attempts = 3, bas
 }
 
 /**
+ * Safety gate before any rmSync of the managed clone directory (F1). A
+ * CCGM_SRC_DIR typo (`$HOME`, `/`, or any other unrelated populated
+ * directory) must never fall through to a recursive delete. Removal is
+ * allowed only when the resolved path is provably the cache this script
+ * owns: its basename is the default `.ccgm-src`, the directory is empty
+ * (nothing to lose), or it already contains a `.git` whose origin points
+ * at the ccgm repo.
+ */
+export function isSafeToRemoveCloneDir(dir: string): boolean {
+  if (basename(dir) === '.ccgm-src') return true;
+  if (!existsSync(dir)) return true;
+  if (readdirSync(dir).length === 0) return true;
+
+  if (existsSync(join(dir, '.git'))) {
+    try {
+      return runGit(['remote', 'get-url', 'origin'], dir) === CCGM_REMOTE;
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Clone contract (§5 E2, adrev2-006): idempotent and re-runnable. Existing
  * clone with matching origin -> fetch + detach onto FETCH_HEAD. Absent, or
  * any inconsistency (wrong/missing origin) -> remove and re-clone.
@@ -144,7 +169,17 @@ async function ensureCcgmClone(cloneDir: string): Promise<void> {
     return;
   }
 
-  if (existsSync(cloneDir)) rmSync(cloneDir, { recursive: true, force: true });
+  if (existsSync(cloneDir)) {
+    if (!isSafeToRemoveCloneDir(cloneDir)) {
+      throw new Error(
+        `ingest: refusing to remove ${cloneDir} before re-cloning ccgm -- resolved from ` +
+          `CCGM_SRC_DIR=${process.env.CCGM_SRC_DIR ?? '(unset, default .ccgm-src)'}. This directory is not named ` +
+          `'.ccgm-src', is not empty, and does not contain a .git repo whose origin matches ${CCGM_REMOTE}. ` +
+          'Check CCGM_SRC_DIR for a typo (e.g. $HOME or /) before re-running.',
+      );
+    }
+    rmSync(cloneDir, { recursive: true, force: true });
+  }
   mkdirSync(dirname(cloneDir), { recursive: true });
   await withNetworkRetry(() => runGit(['clone', '--filter=blob:none', CCGM_REMOTE, cloneDir]), 'cloning ccgm');
 }
@@ -381,6 +416,10 @@ function ingestModule(repoDir: string, repoRootReal: string, moduleDirName: stri
   const contentFiles: ContentFile[] = [];
   const inventory: Record<string, number> = {};
   let contextCostTokens = 0;
+
+  if (manifest.files === null || manifest.files === undefined || typeof manifest.files !== 'object' || Array.isArray(manifest.files)) {
+    throw new Error("module.json 'files' is missing or not an object");
+  }
 
   for (const [path, entry] of Object.entries(manifest.files)) {
     const containment = checkContainment(moduleDir, moduleDirReal, repoRootReal, path);
@@ -644,7 +683,6 @@ async function main(): Promise<void> {
   const scriptDir = fileURLToPath(new URL('.', import.meta.url));
   const siteRepoRoot = resolve(scriptDir, '..');
   const outDir = resolve(siteRepoRoot, 'src', 'generated');
-  const modulesOutDir = join(outDir, 'modules');
   const indexPath = join(outDir, 'modules-index.json');
 
   let repoDir: string;
@@ -672,17 +710,23 @@ async function main(): Promise<void> {
     }
   }
 
-  mkdirSync(modulesOutDir, { recursive: true });
+  mkdirSync(outDir, { recursive: true });
 
   const generatedAt = new Date().toISOString();
   const siteSha = process.env.CF_PAGES_COMMIT_SHA ?? resolveSiteSha(siteRepoRoot);
 
   const { index, presetsFile } = buildIndex({ repoDir, sourceSha, hasOwnGit, siteSha, generatedAt });
 
+  // Nothing reads src/generated/modules/{name}.json -- content.config.ts and
+  // src/lib/generated.ts load modules-index.json only, and every
+  // /modules/{name}.json endpoint (src/pages/modules/[name].json.ts) derives
+  // its response from that index via loadModulesIndex() at request time.
+  // Remove any per-module files a prior run left behind so state stays
+  // consistent; this directory is entirely ingest-owned output.
+  const staleModulesDir = join(outDir, 'modules');
+  if (existsSync(staleModulesDir)) rmSync(staleModulesDir, { recursive: true, force: true });
+
   writeFileSync(indexPath, JSON.stringify(index, null, 2));
-  for (const mod of index.modules) {
-    writeFileSync(join(modulesOutDir, `${mod.name}.json`), JSON.stringify(mod, null, 2));
-  }
   writeFileSync(join(outDir, 'presets.json'), JSON.stringify(presetsFile, null, 2));
 
   const { moduleCount, skippedModules } = index.meta;

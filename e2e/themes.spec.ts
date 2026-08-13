@@ -11,8 +11,12 @@ import { DEFAULT_THEME, THEMES, type Theme } from '../src/lib/site.ts';
  * one CSP-under-load test below therefore hits the wrangler port directly
  * by absolute URL: playwright.config.ts starts both webServers
  * unconditionally for every project, so port 8788 is already up.
+ *
+ * The port is overridable via E2E_PORT_HEADERS (see playwright.config.ts,
+ * issue #14) so this spec still hits the right server under a parallel
+ * worktree run.
  */
-const HEADERS_ORIGIN = 'http://localhost:8788';
+const HEADERS_ORIGIN = `http://localhost:${process.env.E2E_PORT_HEADERS ?? '8788'}`;
 
 const STORAGE_KEY = 'ccgmTheme';
 

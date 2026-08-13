@@ -3,9 +3,9 @@ import { join } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import type { APIRequestContext, Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
-import { THEMES } from '../src/lib/site.ts';
-import { CATEGORY_VALUES } from '../src/lib/schema.ts';
-import { cappedBundleLabel, FULL_BUNDLE_LABEL } from '../src/lib/module-bundle.ts';
+import { SITE_URL, THEMES } from '../src/lib/site.ts';
+import { CATEGORY_VALUES, type ModuleRecord, type ModulesIndex } from '../src/lib/schema.ts';
+import { buildModuleTwin, cappedTwinLabel, FULL_TWIN_LABEL } from '../src/lib/module-twin.ts';
 import {
   MERGE_FRAGMENT_ANNOTATION,
   MERGE_FRAGMENT_COPY_LABEL,
@@ -14,27 +14,24 @@ import {
   ZERO_COST_BADGE_TEXT,
 } from '../src/lib/modulepagecopy.ts';
 
-interface ModulesIndexModule {
-  name: string;
-  displayName: string;
-  category: string;
-  status?: string;
-  tags: string[];
-  contextCostTokens: number;
-  files: Array<{ path: string; rawUrl: string; merge: boolean }>;
-}
-
-interface ModulesIndex {
-  meta: { moduleCount: number; categories: Record<string, number> };
-  modules: ModulesIndexModule[];
-}
-
+/**
+ * The FULL ingested index (src/generated/modules-index.json), not the
+ * public-facing trimmed /modules.json -- this file still carries
+ * contentFiles/readmeMd, which buildModuleTwin() needs to independently
+ * reconstruct the same twin the live page computed.
+ */
 function readModulesIndex(): ModulesIndex {
   const path = join(process.cwd(), 'src', 'generated', 'modules-index.json');
   if (!existsSync(path)) {
     throw new Error('src/generated/modules-index.json does not exist -- run `pnpm build` before `pnpm test:e2e`');
   }
   return JSON.parse(readFileSync(path, 'utf-8'));
+}
+
+function findModule(index: ModulesIndex, name: string): ModuleRecord {
+  const mod = index.modules.find((m) => m.name === name);
+  if (!mod) throw new Error(`modules-index.json has no record for "${name}"`);
+  return mod;
 }
 
 /** The real module.json's own `files` keys, read from the ingested clone -- NOT the site's emitted JSON (§5 E5: comparing a filter's output against itself proves nothing). */
@@ -278,11 +275,9 @@ test.describe('module detail pages: deep-check 5 representative modules', () => 
     await expect(callout).toContainText('postInstall.sh');
     await expect(callout.locator('pre')).not.toHaveText('');
 
-    const index = readModulesIndex();
-    const agentManager = (
-      index as unknown as { modules: Array<{ name: string; sourceUrl: string; postInstallFile: { path: string } }> }
-    ).modules.find((m) => m.name === 'agent-manager')!;
-    const expectedGithubUrl = `${agentManager.sourceUrl.replace('/tree/', '/blob/')}/${agentManager.postInstallFile.path}`;
+    const agentManager = findModule(readModulesIndex(), 'agent-manager');
+    expect(agentManager.postInstallFile).toBeDefined();
+    const expectedGithubUrl = `${agentManager.sourceUrl.replace('/tree/', '/blob/')}/${agentManager.postInstallFile!.path}`;
     await expect(callout.locator('[data-post-install-github-link]')).toHaveAttribute('href', expectedGithubUrl);
 
     // agent-manager declares only a `command` file -- zero always-loaded
@@ -317,50 +312,101 @@ test.describe('placeholder annotation: real-repo negative cases outside the 5 de
   });
 });
 
-test.describe('"copy entire module as markdown" bundle', () => {
-  test('the button label mirrors the bundle endpoint, and the copied text equals it exactly -- for a merge-free and a merge-bearing module', async ({
+test.describe('"copy entire module as markdown" copies the .md twin body (§3.4 clarification, decisions.md)', () => {
+  test('the copied clipboard text equals /modules/{name}.md byte-exact, and the button label mirrors the twin\'s capped state -- for an under-cap and an over-cap module', async ({
     page,
     request,
   }, testInfo) => {
     test.skip(testInfo.project.name !== 'chromium', 'real clipboard read-back needs Chromium/CDP');
 
-    for (const moduleName of ['dreaming', 'autoheal', 'verification']) {
-      const bundleResponse = await request.get(`/modules/${moduleName}/bundle.md`);
-      expect(bundleResponse.ok()).toBeTruthy();
-      const bundleText = await bundleResponse.text();
+    // buildModuleTwin() is the actual source of truth the live page and the
+    // /modules/{name}.md endpoint both call -- reconstructing it here
+    // (rather than pattern-sniffing the fetched text) is exact, not a
+    // heuristic, and covers the same under-cap/over-cap split the real
+    // corpus produces today: verification/autoheal/remote-server fit under
+    // the 512 KB cap (full body inlining); dreaming/commands-extra do not
+    // (links-only fallback, §5's over-cap acceptance case).
+    const index = readModulesIndex();
+    for (const moduleName of ['verification', 'autoheal', 'remote-server', 'dreaming', 'commands-extra']) {
+      const mod = findModule(index, moduleName);
+      const frontMatter = {
+        schemaVersion: index.meta.schemaVersion,
+        module: mod.name,
+        sourceSha: index.meta.sourceSha,
+        generatedAt: index.meta.generatedAt,
+      };
+      const expectedTwin = buildModuleTwin(mod, { siteUrl: SITE_URL, sourceSha: index.meta.sourceSha, frontMatter });
+
+      const twinResponse = await request.get(`/modules/${moduleName}.md`);
+      expect(twinResponse.ok()).toBeTruthy();
+      const twinText = await twinResponse.text();
+      expect(twinText, `${moduleName}: served twin vs independently recomputed twin`).toBe(expectedTwin.text);
 
       await page.goto(`/modules/${moduleName}`);
-      const button = page.locator('[data-copy-source$="/bundle.md"]');
+      const button = page.locator(`[data-copy-source="/modules/${moduleName}.md"]`);
       await expect(button).toBeVisible();
 
-      const tooLargeCount = (bundleText.match(/Too large to inline here/g) ?? []).length;
       const labelText = await button.locator('[data-copy-label]').textContent();
-      if (tooLargeCount > 0) {
-        expect(labelText).toBe(cappedBundleLabel(tooLargeCount));
-      } else {
-        expect(labelText).toBe(FULL_BUNDLE_LABEL);
-      }
+      const expectedLabel = expectedTwin.capped ? cappedTwinLabel(expectedTwin.linkedFileCount) : FULL_TWIN_LABEL;
+      expect(labelText, `${moduleName} button label`).toBe(expectedLabel);
 
       await button.click();
       await expect(button).toHaveAttribute('data-state', 'copied', { timeout: 5000 });
       const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
-      expect(clipboardText).toBe(bundleText);
+      expect(clipboardText, `${moduleName} clipboard vs twin`).toBe(twinText);
     }
   });
 
-  test('excludes merge fragments -- content and manifest link alike -- for autoheal and remote-server', async ({
+  test('an under-cap twin (verification) inlines the full byte-exact content of every declared file', async ({
+    request,
+  }) => {
+    const twinResponse = await request.get('/modules/verification.md');
+    const twinText = await twinResponse.text();
+
+    for (const path of readRealModuleFileKeys('verification')) {
+      const rawResponse = await request.get(`/modules/verification/files/${path}.txt`);
+      const rawContent = await rawResponse.text();
+      expect(twinText, `${path} body inlined in the verification twin`).toContain(rawContent.trim());
+    }
+  });
+
+  test('an under-cap twin never inlines a merge fragment\'s body -- autoheal and remote-server render the annotated link instead', async ({
     request,
   }) => {
     for (const moduleName of ['autoheal', 'remote-server']) {
-      const bundleResponse = await request.get(`/modules/${moduleName}/bundle.md`);
-      const bundleText = await bundleResponse.text();
+      const twinResponse = await request.get(`/modules/${moduleName}.md`);
+      const twinText = await twinResponse.text();
 
       const rawResponse = await request.get(`/modules/${moduleName}/files/settings.partial.json.txt`);
       const rawContent = (await rawResponse.text()).trim();
 
-      expect(bundleText).not.toContain(rawContent);
-      // Named in the excluded-fragments note, but never embedded as content.
-      expect(bundleText).toContain('settings.partial.json');
+      expect(twinText, `${moduleName} twin must not embed the merge fragment body`).not.toContain(rawContent);
+      expect(twinText, `${moduleName} twin must annotate the merge fragment`).toContain('merge fragment');
+      expect(twinText, `${moduleName} twin must still link the merge fragment's raw URL`).toContain(
+        `/modules/${moduleName}/files/settings.partial.json.txt`,
+      );
+    }
+  });
+
+  test('over-cap twins (dreaming, commands-extra) keep their Files section links-only, with the relabelled button naming the real link count', async ({
+    request,
+  }) => {
+    for (const moduleName of ['dreaming', 'commands-extra']) {
+      const twinResponse = await request.get(`/modules/${moduleName}.md`);
+      const twinText = await twinResponse.text();
+
+      // Scoped to the "## Files" section: an over-cap module may still
+      // keep its README inlined (a separate, independent fallback tier --
+      // dropping file bodies alone is often enough to clear the cap), and
+      // a real README can legitimately contain its own fenced examples.
+      // The Files section itself, though, is always the flat
+      // "- `path` (...): url" link format -- never a fenced code block.
+      const filesSectionStart = twinText.indexOf('\n## Files\n');
+      expect(filesSectionStart, `${moduleName}: no "## Files" section found`).toBeGreaterThan(-1);
+      const filesSection = twinText.slice(filesSectionStart);
+
+      expect(filesSection).not.toContain('```');
+      expect(filesSection).toMatch(/^- `/m);
     }
   });
 });

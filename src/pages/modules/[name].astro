@@ -17,7 +17,7 @@ import Base from '../../layouts/Base.astro';
 import CopyButton from '../../components/CopyButton.astro';
 import ModuleFileSection from '../../components/ModuleFileSection.astro';
 import ModuleInstallStrip from '../../components/ModuleInstallStrip.astro';
-import { buildModuleBundle } from '../../lib/module-bundle.ts';
+import { buildModuleTwin, cappedTwinLabel, FULL_TWIN_LABEL } from '../../lib/module-twin.ts';
 import { loadModulesIndex } from '../../lib/generated.ts';
 import { computeInlineBudget } from '../../lib/inline-budget.ts';
 import { renderMarkdownToHtml } from '../../lib/markdown.ts';
@@ -98,8 +98,21 @@ const groupedFiles = FILE_TYPE_BUCKETS.map((type) => ({
   files: mod.contentFiles.filter((file) => file.type === type),
 })).filter((group) => group.files.length > 0);
 
-const bundle = buildModuleBundle(mod, SITE_URL, meta.sourceSha);
-const bundleUrl = `/modules/${mod.name}/bundle.md`;
+// "Copy entire module" copies the twin body verbatim (§3.4 clarification,
+// decisions.md): the exact same computation /modules/{name}.md serves, via
+// CopyButton's sourceUrl fetch-then-copy mode -- never embedded in this
+// page's own HTML a second time. Computed here only for its capped /
+// linkedFileCount flags, which drive the button's label; `.text` is
+// discarded (unused) rather than written into the DOM.
+const twinFrontMatter = {
+  schemaVersion: meta.schemaVersion,
+  module: mod.name,
+  sourceSha: meta.sourceSha,
+  generatedAt: meta.generatedAt,
+};
+const twin = buildModuleTwin(mod, { siteUrl: SITE_URL, sourceSha: meta.sourceSha, frontMatter: twinFrontMatter });
+const copyEntireLabel = twin.capped ? cappedTwinLabel(twin.linkedFileCount) : FULL_TWIN_LABEL;
+const twinUrl = `/modules/${mod.name}.md`;
 ---
 
 <Base
@@ -260,7 +273,7 @@ const bundleUrl = `/modules/${mod.name}/bundle.md`;
       )}
 
       <p>
-        <CopyButton sourceUrl={bundleUrl} label={`the entire ${mod.displayName} module as markdown`} idleLabel={bundle.label} class="copy-entire-module" />
+        <CopyButton sourceUrl={twinUrl} label={`the entire ${mod.displayName} module as markdown`} idleLabel={copyEntireLabel} class="copy-entire-module" />
       </p>
 
       {groupedFiles.map((group) => (

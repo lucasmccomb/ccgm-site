@@ -262,7 +262,17 @@ describe('E2 structural invariants (ingest pipeline, hard-asserted, never loosen
     const offenders: string[] = [];
 
     for (const file of mdFiles) {
-      const content = readFileSync(join(modulesDir, file), 'utf-8');
+      const rawContent = readFileSync(join(modulesDir, file), 'utf-8');
+      // Under-cap module twins (§5 E5, decisions.md) inline full file
+      // bodies inside fenced code blocks -- source code (a regex literal
+      // like `[^/:]+`, a shell parameter expansion) can coincidentally
+      // match `](...)`) without being a markdown link at all. Strip
+      // well-formed fenced blocks (opening/closing fence of the SAME
+      // backtick run length, matched via backreference so a shorter
+      // backtick run inside the content can't prematurely "close" it)
+      // before scanning -- this only removes fenced code, never prose,
+      // so a real un-rewritten link outside a fence is still caught.
+      const content = rawContent.replace(/^(`{3,})[^\n]*\n[\s\S]*?^\1[ \t]*$/gm, '');
       let match: RegExpExecArray | null;
       while ((match = linkPattern.exec(content)) !== null) {
         const url = match[1];

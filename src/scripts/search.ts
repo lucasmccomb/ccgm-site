@@ -109,9 +109,31 @@ function renderResults(
   status.textContent = `${results.length} result${results.length === 1 ? '' : 's'} for "${query}"`;
 }
 
+/**
+ * Monotonic request token (Stage-2 review F1): with DEBOUNCE_MS=150 and
+ * ~200-300ms/keystroke typing, concurrent in-flight queries are the normal
+ * case, not an edge -- an earlier query's pagefind.search()/ref.data()
+ * promises can resolve AFTER a later query's and overwrite the DOM with
+ * stale results. Every call increments this counter and captures its own
+ * id; every DOM write below is guarded by comparing that id against the
+ * counter's current value immediately before writing, so a call that lost
+ * the race (a newer one started since) discards its result instead of
+ * rendering it.
+ */
+let latestRequestId = 0;
+
+function showUnavailable(list: HTMLElement, status: HTMLElement): void {
+  list.hidden = true;
+  list.textContent = '';
+  status.textContent = 'Search is unavailable.';
+}
+
 async function runSearch(query: string, list: HTMLElement, status: HTMLElement): Promise<void> {
+  const requestId = ++latestRequestId;
   const trimmed = query.trim();
+
   if (!trimmed) {
+    if (requestId !== latestRequestId) return;
     list.hidden = true;
     list.textContent = '';
     status.textContent = '';
@@ -122,21 +144,38 @@ async function runSearch(query: string, list: HTMLElement, status: HTMLElement):
   try {
     pagefind = await loadPagefind();
   } catch {
-    status.textContent = 'Search is unavailable.';
+    if (requestId !== latestRequestId) return;
+    showUnavailable(list, status);
     return;
   }
 
-  const { results: refs } = await pagefind.search(trimmed);
-  const top = refs.slice(0, MAX_RESULTS);
-  const dataResults = await Promise.all(top.map((ref) => ref.data()));
+  // F2: pagefind.search() and every ref.data() call are real network/WASM
+  // operations that can transiently fail. runSearch is invoked as `void`
+  // from a setTimeout callback, so an unhandled rejection here would be
+  // silently swallowed and the UI would keep showing the previous query's
+  // results forever. Guarded by the same staleness token so a failure from
+  // an already-superseded query never clobbers a newer, successful one.
+  // On failure, the results list is cleared/hidden along with the status
+  // message -- a stale result set left visible underneath "Search is
+  // unavailable." would be its own, quieter version of the same bug.
+  try {
+    const { results: refs } = await pagefind.search(trimmed);
+    const top = refs.slice(0, MAX_RESULTS);
+    const dataResults = await Promise.all(top.map((ref) => ref.data()));
 
-  const rendered: RenderedResult[] = dataResults.map((data) => ({
-    url: data.url,
-    title: data.meta?.title ?? data.url,
-    excerptHtml: sanitizeExcerptHtml(data.excerpt),
-  }));
+    if (requestId !== latestRequestId) return;
 
-  renderResults(list, status, rendered, trimmed);
+    const rendered: RenderedResult[] = dataResults.map((data) => ({
+      url: data.url,
+      title: data.meta?.title ?? data.url,
+      excerptHtml: sanitizeExcerptHtml(data.excerpt),
+    }));
+
+    renderResults(list, status, rendered, trimmed);
+  } catch {
+    if (requestId !== latestRequestId) return;
+    showUnavailable(list, status);
+  }
 }
 
 export function initSearch(): void {

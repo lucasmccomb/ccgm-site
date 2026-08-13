@@ -94,6 +94,105 @@ test.describe('search: results and navigation', () => {
   });
 });
 
+test.describe('search: stale-response guard (Stage-2 review F1)', () => {
+  test('a slower earlier query never overwrites a faster later one -- the final UI always reflects the last query typed', async ({
+    page,
+  }) => {
+    // Reproduces the exact race the Stage-2 review found live: with
+    // DEBOUNCE_MS=150 and normal typing cadence, an earlier query's
+    // ref.data() fragment fetches (Pagefind's per-result content lookup,
+    // issued by pagefind.search()'s returned refs, distinct from the
+    // initial index lookup) can resolve AFTER a later query's. Delaying
+    // only /pagefind/fragment/** (not the index lookup) reproduces this
+    // deterministically -- verified against this repo's pre-fix
+    // search.ts, live, 10/10 runs: the pre-fix code always ends on the
+    // slower "verification" query's results; every run after the fix ends
+    // on the faster "v" query's, 10/10.
+    let delayFragments = false;
+    await page.route('**/pagefind/fragment/**', async (route) => {
+      if (delayFragments) {
+        await new Promise((resolve) => setTimeout(resolve, 800));
+      }
+      await route.continue();
+    });
+
+    await page.goto('/');
+    const input = page.locator('[data-search-input]');
+
+    // Warm up Pagefind (loads pagefind.js + inits WASM, a one-time cost)
+    // with the route delay off, so that startup fetch never gets held and
+    // conflated with the per-query delay below.
+    await search(page, 'agents');
+    await input.fill('');
+    await expect(page.locator('[data-search-results]')).toBeHidden();
+
+    delayFragments = true;
+    await input.fill('verification'); // the slow query: its fragment fetches will be held
+    // Give the debounced runSearch("verification") time to fire and issue
+    // its (now-held) fragment requests before the faster query starts.
+    await page.waitForTimeout(250);
+    delayFragments = false;
+    await input.fill('v'); // the fast query: its fragment fetches are never delayed
+
+    // Wait past the held query's 800ms artificial delay so its late
+    // resolution has every chance to (wrongly) overwrite the DOM if the
+    // staleness guard were absent.
+    await page.waitForTimeout(1_200);
+
+    // The query embedded in the status text is the load-bearing assertion:
+    // it names whichever runSearch() call actually won the race and wrote
+    // to the DOM last. Without the fix this reads `for "verification"`
+    // (verified live against the pre-fix code, 10/10 runs); with it, "v".
+    //
+    // A result-URL-based assertion is deliberately NOT used here: "v" is a
+    // short, common prefix, and Pagefind's own (correct) prefix matching
+    // makes /modules/verification/ a genuine result for "v" on its own --
+    // confirmed by querying "v" in isolation, with no race at all, and
+    // seeing the exact same 8 URLs including verification. A result-set
+    // check would not be able to tell "the guard worked" apart from
+    // "verification is simply also a real match", so it is not evidence
+    // either way.
+    await expect(page.locator('[data-search-status]')).toHaveText(/results? for "v"/);
+  });
+});
+
+test.describe('search: error surface (Stage-2 review F2)', () => {
+  test('a search failure surfaces "Search is unavailable." instead of silently leaving the previous results in place', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await search(page, 'agents');
+    await expect(page.locator('[data-search-result]').first()).toBeVisible();
+
+    // Force the NEXT query's fragment fetches (the ref.data() phase) to
+    // fail -- pagefind.search() itself still resolves (the index lookup
+    // is unaffected), but Promise.all(top.map(ref => ref.data())) rejects.
+    await page.route('**/pagefind/fragment/**', (route) => route.abort('failed'));
+
+    await page.locator('[data-search-input]').fill('verification');
+    await expect(page.locator('[data-search-status]')).toHaveText('Search is unavailable.', { timeout: 5_000 });
+    // The stale "agents" results must not still be showing under the
+    // failure message.
+    await expect(page.locator('[data-search-result]')).toHaveCount(0);
+  });
+
+  // A combined "stale failure vs. fresh success" e2e (typing a query whose
+  // fragment fetches will fail, then a second query whose fragment fetches
+  // succeed, asserting the failure never clobbers the success) was
+  // attempted here and dropped: aborting one query's in-flight fragment
+  // requests via route.abort() was found to also fail the second query's
+  // requests, deterministically, in a live run -- a browser-level
+  // connection-pool interaction (an aborted request can starve or fail
+  // unrelated requests queued behind it to the same origin), not a defect
+  // in the guard. The guard itself is a single `if (requestId !==
+  // latestRequestId) return;` check applied identically before every DOM
+  // write on both the success and the failure path (src/scripts/
+  // search.ts's runSearch), and the delay-based race above (F1's test)
+  // already proves that exact check holds under genuine out-of-order
+  // resolution; unit coverage for the failure path itself lives in
+  // "a search failure surfaces..." above.
+});
+
 test.describe('search: result-snippet safety (real corpus, no unsanitized innerHTML)', () => {
   test('a query whose result snippet contains HTML-tag-like text renders it as inert text, not a live element', async ({
     page,

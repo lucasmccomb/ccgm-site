@@ -12,10 +12,14 @@ name: nightly-rebuild
 # deploy on top of a broken pipeline. Otherwise `pnpm census:check` a
 # non-empty delta against tests/fixtures/repo-census.json is CONTENT, not
 # breakage (§1.4 principle 13): open/update the same issue naming the
-# delta, and rebuild anyway. Then POST the deploy hook and verify the
-# deploy actually landed (scripts/verify-rebuild.sh) -- POSTing is not
-# evidence of a successful rebuild, a Cloudflare-side build failure is
-# otherwise invisible outside the CF dashboard.
+# delta, and rebuild anyway. Then a single `scripts/verify-rebuild.sh`
+# invocation both POSTs the deploy hook (its own contract: it self-POSTs
+# whenever $CCGM_SITE_DEPLOY_HOOK_URL is present in its environment) and
+# polls for the deploy to actually land -- POSTing is not evidence of a
+# successful rebuild, a Cloudflare-side build failure is otherwise
+# invisible outside the CF dashboard. There is deliberately no separate
+# POST step: calling the hook from both a standalone curl and from
+# verify-rebuild.sh's own self-POST would fire it twice per run.
 #
 # workflow_dispatch inputs exist to verify the drift-check/census/alert
 # paths without waiting for 03:00 UTC or for real ccgm content to actually
@@ -24,6 +28,10 @@ name: nightly-rebuild
 # always suppresses the hook POST and verification poll too (the "Compute
 # effective deploy gate" step below), regardless of the `suppress_hook`
 # input -- a fixture-based test run must never reach the real deployment.
+# The same gate also skips the whole POST+verify sequence whenever
+# $CCGM_SITE_DEPLOY_HOOK_URL is unset (e.g. pre-HE1) -- otherwise the poll
+# would run anyway, time out after 15 minutes against a site that never
+# rebuilt, and open a false deploy-stale issue every night.
 
 on:
   schedule:
@@ -67,11 +75,24 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check deploy hook secret
+        id: check-secret
+        env:
+          HOOK_URL: ${{ secrets.CCGM_SITE_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$HOOK_URL" ]; then
+            echo "::notice::deploy hook not configured, skipping the POST + verification sequence"
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Compute effective deploy gate
         id: gate
         env:
           REPO_DIR: ${{ inputs.repo_dir }}
           SUPPRESS_HOOK: ${{ inputs.suppress_hook }}
+          SECRET_CONFIGURED: ${{ steps.check-secret.outputs.configured }}
         run: |
           # A --repo-dir test/fixture run must NEVER touch the real
           # deployment -- its sourceSha is not a real ccgm commit
@@ -80,7 +101,12 @@ jobs:
           # either corrupt production with test data or raise a bogus
           # deploy-stale alert. Force suppression whenever repo_dir is set,
           # regardless of whether the operator also passed suppress_hook.
-          if [ -n "$REPO_DIR" ] || [ "$SUPPRESS_HOOK" = "true" ]; then
+          #
+          # A missing CCGM_SITE_DEPLOY_HOOK_URL secret (e.g. pre-HE1) must
+          # also skip the whole sequence: scripts/verify-rebuild.sh's
+          # poll-only mode would otherwise poll for 15 minutes against a
+          # site that never rebuilds and open a false deploy-stale issue.
+          if [ -n "$REPO_DIR" ] || [ "$SUPPRESS_HOOK" = "true" ] || [ "$SECRET_CONFIGURED" != "true" ]; then
             echo "deploy=false" >> "$GITHUB_OUTPUT"
           else
             echo "deploy=true" >> "$GITHUB_OUTPUT"
@@ -153,20 +179,7 @@ jobs:
           SHA="$(python3 -c 'import json; print(json.load(open("src/generated/modules-index.json"))["meta"]["sourceSha"])')"
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
 
-      - name: POST deploy hook
-        id: trigger
-        if: steps.check.outputs.status != 'structural_failure' && steps.gate.outputs.deploy == 'true'
-        continue-on-error: true
-        env:
-          CCGM_SITE_DEPLOY_HOOK_URL: ${{ secrets.CCGM_SITE_DEPLOY_HOOK_URL }}
-        run: |
-          if [ -z "$CCGM_SITE_DEPLOY_HOOK_URL" ]; then
-            echo "::notice::deploy hook not configured, skipping"
-            exit 0
-          fi
-          curl -fsS --retry 3 --retry-all-errors --retry-delay 5 -X POST "$CCGM_SITE_DEPLOY_HOOK_URL"
-
-      - name: Verify rebuild landed (generatedAt advance)
+      - name: Verify rebuild landed (POSTs the hook, then polls for generatedAt advance)
         id: verify
         if: steps.check.outputs.status != 'structural_failure' && steps.gate.outputs.deploy == 'true'
         continue-on-error: true
@@ -204,7 +217,7 @@ jobs:
           exit 1
 
       - name: Open or update deploy-stale issue
-        if: steps.check.outputs.status != 'structural_failure' && steps.gate.outputs.deploy == 'true' && (steps.trigger.outcome == 'failure' || steps.verify.outcome == 'failure' || steps.verify-source-sha.outcome == 'failure')
+        if: steps.check.outputs.status != 'structural_failure' && steps.gate.outputs.deploy == 'true' && (steps.verify.outcome == 'failure' || steps.verify-source-sha.outcome == 'failure')
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

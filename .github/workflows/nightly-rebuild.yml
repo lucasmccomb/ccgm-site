@@ -20,7 +20,10 @@ name: nightly-rebuild
 # workflow_dispatch inputs exist to verify the drift-check/census/alert
 # paths without waiting for 03:00 UTC or for real ccgm content to actually
 # drift -- see scripts/nightly-check.ts's header comment for exactly how
-# each path was exercised during E7 verification.
+# each path was exercised during E7 verification. Passing `repo_dir`
+# always suppresses the hook POST and verification poll too (the "Compute
+# effective deploy gate" step below), regardless of the `suppress_hook`
+# input -- a fixture-based test run must never reach the real deployment.
 
 on:
   schedule:
@@ -63,6 +66,25 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Compute effective deploy gate
+        id: gate
+        env:
+          REPO_DIR: ${{ inputs.repo_dir }}
+          SUPPRESS_HOOK: ${{ inputs.suppress_hook }}
+        run: |
+          # A --repo-dir test/fixture run must NEVER touch the real
+          # deployment -- its sourceSha is not a real ccgm commit
+          # ('fixture' for a repo-dir with no .git of its own), so POSTing
+          # the hook or comparing that value against ccgm's history would
+          # either corrupt production with test data or raise a bogus
+          # deploy-stale alert. Force suppression whenever repo_dir is set,
+          # regardless of whether the operator also passed suppress_hook.
+          if [ -n "$REPO_DIR" ] || [ "$SUPPRESS_HOOK" = "true" ]; then
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Structural + census check
         id: check
@@ -126,14 +148,14 @@ jobs:
 
       - name: Record the ingested sourceSha (the HEAD recorded at start)
         id: recorded-sha
-        if: steps.check.outputs.status != 'structural_failure' && inputs.suppress_hook != true
+        if: steps.check.outputs.status != 'structural_failure' && steps.gate.outputs.deploy == 'true'
         run: |
           SHA="$(python3 -c 'import json; print(json.load(open("src/generated/modules-index.json"))["meta"]["sourceSha"])')"
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
 
       - name: POST deploy hook
         id: trigger
-        if: steps.check.outputs.status != 'structural_failure' && inputs.suppress_hook != true
+        if: steps.check.outputs.status != 'structural_failure' && steps.gate.outputs.deploy == 'true'
         continue-on-error: true
         env:
           CCGM_SITE_DEPLOY_HOOK_URL: ${{ secrets.CCGM_SITE_DEPLOY_HOOK_URL }}
@@ -146,7 +168,7 @@ jobs:
 
       - name: Verify rebuild landed (generatedAt advance)
         id: verify
-        if: steps.check.outputs.status != 'structural_failure' && inputs.suppress_hook != true
+        if: steps.check.outputs.status != 'structural_failure' && steps.gate.outputs.deploy == 'true'
         continue-on-error: true
         env:
           CCGM_SITE_DEPLOY_HOOK_URL: ${{ secrets.CCGM_SITE_DEPLOY_HOOK_URL }}
@@ -182,7 +204,7 @@ jobs:
           exit 1
 
       - name: Open or update deploy-stale issue
-        if: steps.check.outputs.status != 'structural_failure' && inputs.suppress_hook != true && (steps.trigger.outcome == 'failure' || steps.verify.outcome == 'failure' || steps.verify-source-sha.outcome == 'failure')
+        if: steps.check.outputs.status != 'structural_failure' && steps.gate.outputs.deploy == 'true' && (steps.trigger.outcome == 'failure' || steps.verify.outcome == 'failure' || steps.verify-source-sha.outcome == 'failure')
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

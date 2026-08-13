@@ -314,6 +314,12 @@ GitHub Actions green while the site quietly goes stale:
    `sourceSha` is the ccgm HEAD it ingested at start or a descendant of it
    (so a merge landing mid-poll never raises a false alarm), opening/
    updating a `deploy-stale` issue on any of those failing.
+   `workflow_dispatch` accepts an optional `repo_dir` input (a local/test-only
+   `--repo-dir` fixture path, e.g. `tests/fixtures/ccgm-mini`) to exercise
+   the drift-check/census paths on demand -- passing it always suppresses
+   the hook POST and verification poll, regardless of the separate
+   `suppress_hook` input, since a fixture run's `sourceSha` is never a real
+   ccgm commit and must never reach the real deployment.
 3. **Verification scripts**, runnable against any deployment (local
    wrangler, a PR preview, or production):
    - `scripts/verify-headers.sh <base-url>` -- security + discovery

@@ -14,8 +14,12 @@ import { mdTwinUrlFor } from '../src/lib/mdtwin.ts';
  * directly by absolute URL, the same pattern e2e/themes.spec.ts already
  * established -- playwright.config.ts starts both webServers
  * unconditionally for every project, so port 8788 is already up.
+ *
+ * The port is overridable via E2E_PORT_HEADERS (see playwright.config.ts,
+ * issue #14) so this spec still hits the right server under a parallel
+ * worktree run.
  */
-const HEADERS_ORIGIN = 'http://localhost:8788';
+const HEADERS_ORIGIN = `http://localhost:${process.env.E2E_PORT_HEADERS ?? '8788'}`;
 
 async function waitForResults(page: Page): Promise<void> {
   await expect(page.locator('[data-search-status]')).not.toHaveText('', { timeout: 10_000 });
@@ -277,7 +281,7 @@ test.describe('search: progressive enhancement (no JS)', () => {
   });
 });
 
-test.describe('search under the production CSP (wrangler pages dev, port 8788)', () => {
+test.describe('search under the production CSP (wrangler pages dev, "headers" project)', () => {
   test('a real query against the CSP-enforced deployment returns results with zero CSP-violation console errors', async ({
     page,
   }) => {

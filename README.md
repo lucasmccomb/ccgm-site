@@ -352,4 +352,7 @@ GitHub Actions green while the site quietly goes stale:
   landing-page transfer-size budget in `e2e/perf.spec.ts`) and
   `wrangler pages dev dist` (the "headers" project, the only place the site
   is exercised under its real CSP -- `e2e/headers.spec.ts` also shells out
-  to `scripts/verify-headers.sh` against that server).
+  to `scripts/verify-headers.sh` against that server). Both ports default to
+  4321 / 8788 but are overridable via `E2E_PORT_PREVIEW` / `E2E_PORT_HEADERS`,
+  so sibling worktrees can run `test:e2e` at the same time without colliding
+  on the default ports.

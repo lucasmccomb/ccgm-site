@@ -81,6 +81,15 @@ const dependents = modules
 // every <pre> this page renders from README markdown.
 const readmeHtml = mod.readmeMd ? renderMarkdownToHtml(mod.readmeMd).replace(/<pre(?![^>]*\btabindex=)/g, '<pre tabindex="0"') : '';
 
+// postInstall names a path OUTSIDE files[] (§3.3) -- its callout links to
+// GitHub at the pinned SHA rather than the site's own raw-text endpoint,
+// per the plan's explicit "CopyButton and GitHub link" pairing. Derived
+// from mod.sourceUrl (a /tree/ link) rather than hardcoding the repo URL a
+// second time in this page.
+const postInstallGithubUrl = mod.postInstallFile
+  ? `${mod.sourceUrl.replace('/tree/', '/blob/')}/${mod.postInstallFile.path}`
+  : '';
+
 const inlineBudget = computeInlineBudget(mod.contentFiles);
 const inlinedPaths = new Set(inlineBudget.items.filter((item) => item.inlined).map((item) => item.file.path));
 
@@ -223,7 +232,9 @@ const bundleUrl = `/modules/${mod.name}/bundle.md`;
           <>
             <pre id="post-install-body" class="command-block">{mod.postInstallFile.content}</pre>
             <CopyButton targetId="post-install-body" label={`the ${mod.postInstall} follow-up script`} />
-            <p><a href={mod.postInstallFile.rawUrl} data-post-install-raw-link>View raw</a></p>
+            <p>
+              <a href={postInstallGithubUrl} data-post-install-github-link>{SOURCE_LINK_LABEL}</a>
+            </p>
           </>
         )}
       </section>

@@ -272,10 +272,18 @@ test.describe('module detail pages: deep-check 5 representative modules', () => 
     await expect(gate.locator('[data-install-strip]')).toHaveCount(1);
 
     // postInstall names a path outside files[] -- the callout must render
-    // its actual content, not a dead reference.
+    // its actual content, not a dead reference, plus a GitHub link at the
+    // pinned SHA (§5 E5: "CopyButton and GitHub link").
     const callout = page.locator('[data-post-install-callout]');
     await expect(callout).toContainText('postInstall.sh');
     await expect(callout.locator('pre')).not.toHaveText('');
+
+    const index = readModulesIndex();
+    const agentManager = (
+      index as unknown as { modules: Array<{ name: string; sourceUrl: string; postInstallFile: { path: string } }> }
+    ).modules.find((m) => m.name === 'agent-manager')!;
+    const expectedGithubUrl = `${agentManager.sourceUrl.replace('/tree/', '/blob/')}/${agentManager.postInstallFile.path}`;
+    await expect(callout.locator('[data-post-install-github-link]')).toHaveAttribute('href', expectedGithubUrl);
 
     // agent-manager declares only a `command` file -- zero always-loaded
     // rule files -- so the cost badge must render the zero-cost text, not

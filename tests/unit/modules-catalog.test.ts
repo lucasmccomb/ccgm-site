@@ -119,16 +119,25 @@ describe('module detail pages: per-page inline budget (§3.4 fill rule)', () => 
 });
 
 describe('full `pnpm build` duration (§5 E5 acceptance: recorded and within budget)', () => {
-  it('completes within the stated 10-minute budget (Cloudflare Pages caps at 20 minutes)', () => {
-    const BUDGET_MS = 10 * 60 * 1000;
+  const BUDGET_MS = 10 * 60 * 1000;
 
-    const start = Date.now();
-    const result = spawnSync('pnpm', ['build'], { cwd: REPO_ROOT, encoding: 'utf-8' });
-    const durationMs = Date.now() - start;
+  // Vitest's own default per-test timeout (5000ms) is unrelated to and far
+  // smaller than BUDGET_MS above -- it caps how long THIS TEST is allowed
+  // to run, not the build it is asserting about. Give the test itself
+  // enough headroom to actually observe a build finishing within budget,
+  // plus slack for process spawn/teardown overhead.
+  it(
+    'completes within the stated 10-minute budget (Cloudflare Pages caps at 20 minutes)',
+    () => {
+      const start = Date.now();
+      const result = spawnSync('pnpm', ['build'], { cwd: REPO_ROOT, encoding: 'utf-8' });
+      const durationMs = Date.now() - start;
 
-    console.log(`pnpm build duration: ${durationMs}ms (${(durationMs / 1000).toFixed(1)}s), budget ${BUDGET_MS}ms`);
+      console.log(`pnpm build duration: ${durationMs}ms (${(durationMs / 1000).toFixed(1)}s), budget ${BUDGET_MS}ms`);
 
-    expect(result.status, result.stderr).toBe(0);
-    expect(durationMs).toBeLessThan(BUDGET_MS);
-  });
+      expect(result.status, result.stderr).toBe(0);
+      expect(durationMs).toBeLessThan(BUDGET_MS);
+    },
+    BUDGET_MS + 30_000, // test timeout: budget + slack for spawn/teardown overhead
+  );
 });

@@ -1,13 +1,50 @@
 ---
 /**
- * Basic 404 page (E1). E6 (wave 3) themes this fully and adds catalog +
- * search links as part of global chrome polish.
+ * Themed 404 (§5 E6 scope: "404 page (themed, links to catalog + search)").
+ * Uses Base.astro like every other page, so it is fully themed via
+ * data-theme and carries the same skip link / header search / footer as
+ * the rest of the site.
+ *
+ * The search link is a plain in-page fragment link to the header search
+ * island's input (mounted once in Base.astro, present on this page too):
+ * per the HTML fragment-navigation algorithm, following a link to a
+ * focusable target both scrolls to and focuses it, with no extra script
+ * needed here.
+ *
+ * data-pagefind-ignore on the whole section: a "page not found" page has
+ * no content worth surfacing as a search result.
  */
 import Base from '../layouts/Base.astro';
 ---
 
-<Base title="Page not found -- CCGM" description="This page does not exist.">
-  <h1>Page not found</h1>
-  <p>The page you were looking for does not exist.</p>
-  <p><a href="/">Return to the homepage</a></p>
+<Base
+  title="Page not found -- CCGM"
+  description="This page does not exist. Browse the module catalog or search for what you were looking for."
+>
+  <section class="not-found" data-not-found data-pagefind-ignore>
+    <h1>Page not found</h1>
+    <p>
+      The page you were looking for doesn't exist -- it may have moved, or the module it pointed to
+      is no longer part of ccgm (per-module URLs are not permanent; see the URL-impermanence note on
+      the agents page).
+    </p>
+    <nav class="not-found__links" aria-label="What to do next">
+      <a href="/modules">Browse the module catalog</a>
+      <a href="#site-search-input">Search modules</a>
+    </nav>
+  </section>
 </Base>
+
+<style>
+  .not-found {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-unit);
+  }
+
+  .not-found__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--space-unit) * 2);
+  }
+</style>

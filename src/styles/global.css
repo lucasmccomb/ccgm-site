@@ -123,6 +123,25 @@ body {
 }
 
 /*
+ * Focus-visible ring, themed via semantic tokens (§5 E6: "focus-visible
+ * styles across themes"). A single global rule keyed on --color-accent
+ * automatically adapts per data-theme without touching any theme CSS token
+ * file (src/styles/themes/*.css stay E3's alone) -- the indirection through
+ * the frozen token is what makes one rule correct across all three themes.
+ * Covers every interactive element site-wide: buttons, links, inputs,
+ * tag-filter chips, CopyButton, the skip link, and the search input --
+ * anything with a component-local <style> block relies on this rule rather
+ * than redeclaring its own, since Astro's scoped styles never reach across
+ * component boundaries to cover them all from one place.
+ */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+/*
  * `<pre>` elements (the ASCII banner, install-command blocks, future code
  * samples) already carry `overflow-x: auto` so long lines scroll inside
  * themselves instead of forcing page-wide horizontal overflow -- but that

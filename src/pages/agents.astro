@@ -4,6 +4,10 @@
  *
  * The zero-cost module percentage is computed from the ingested collection
  * at render time -- never a hardcoded census number (§1.4 principle 2/13).
+ *
+ * The prompt <pre> carries tabindex="0" (E6 a11y fix, same reason as
+ * install.astro's command blocks): axe's scrollable-region-focusable rule
+ * fires once a long prompt overflows horizontally in a given theme.
  */
 import { getCollection } from 'astro:content';
 import Base from '../layouts/Base.astro';
@@ -127,7 +131,7 @@ const prompts = agentPrompts(SITE_URL);
         prompts.map((prompt) => (
           <li>
             <p>{prompt.label}</p>
-            <pre id={`agent-prompt-${prompt.id}`} class="command-block">{prompt.text}</pre>
+            <pre id={`agent-prompt-${prompt.id}`} tabindex="0" class="command-block">{prompt.text}</pre>
             <CopyButton targetId={`agent-prompt-${prompt.id}`} label={prompt.label} />
           </li>
         ))

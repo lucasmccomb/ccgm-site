@@ -87,8 +87,11 @@ function findSafeCut(text: string, budget: number): number {
     } else if (!inBacktick) {
       if (ch === '[') {
         linkDepth = 1;
-      } else if (ch === ']' && linkDepth === 1 && text[i + 1] === '(') {
-        linkDepth = 2;
+      } else if (ch === ']' && linkDepth === 1) {
+        // Only a real markdown link continues into the URL span; a `[` that
+        // never reaches `](` (e.g. a "[DEPRECATED]" tag) is plain text --
+        // close the span here instead of stalling the tracker at depth 1.
+        linkDepth = text[i + 1] === '(' ? 2 : 0;
       } else if (ch === ')' && linkDepth === 2) {
         linkDepth = 0;
       }

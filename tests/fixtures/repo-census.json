@@ -1,0 +1,34 @@
+{
+  "moduleCount": 78,
+  "declaredFileCount": 508,
+  "typeHistogram": {
+    "skill": 24,
+    "agent": 27,
+    "command": 69,
+    "rule": 62,
+    "doc": 82,
+    "script": 100,
+    "hook": 33,
+    "config": 12,
+    "lib": 81,
+    "skill-reference": 1,
+    "content": 16,
+    "settings": 1
+  },
+  "statusDistribution": {
+    "none": 74,
+    "deprecated": 1,
+    "beta": 3
+  },
+  "presetSizes": {
+    "cloud-agent": 55,
+    "full": 74,
+    "minimal": 3,
+    "standard": 16,
+    "team": 22
+  },
+  "marketplaceBijection": true,
+  "skippedFilesEmpty": true,
+  "sanitizedFilesEmpty": true,
+  "danglingDependenciesEmpty": true
+}

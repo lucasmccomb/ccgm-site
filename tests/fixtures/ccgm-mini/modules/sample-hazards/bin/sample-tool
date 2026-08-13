@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Extension-less fixture executable -- must be emitted via content sniff,
+# never dropped by an extension allowlist.
+echo "sample-tool ran"

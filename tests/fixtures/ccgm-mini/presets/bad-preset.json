@@ -1,0 +1,3 @@
+{
+  "this": "is an object, not a bare array of module-name strings -- ingest must refuse this file into skippedModules and never treat it as a sixth preset"
+}

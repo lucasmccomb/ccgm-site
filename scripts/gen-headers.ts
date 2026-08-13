@@ -108,7 +108,19 @@ export function buildHeadersFile(rootDir: string, siteUrl: string): string {
     '/*.md',
     '  Content-Type: text/markdown; charset=utf-8',
     '  X-Robots-Tag: noindex, nofollow',
+    '/*.json',
+    '  Content-Type: application/json',
     '',
+    // No rule for the raw per-file `/modules/*/files/*.txt` endpoints:
+    // Cloudflare Pages applies EVERY matching rule and CONCATENATES
+    // header values when more than one rule sets the same header for a
+    // path (verified empirically against `wrangler pages dev` -- a
+    // `/modules/*` catch-all combined with `/*.md`/`/*.json` produced
+    // `Content-Type: text/plain; charset=utf-8, application/json`, not an
+    // override). Cloudflare's own default MIME inference already serves
+    // `.txt` as `text/plain; charset=utf-8` with no explicit rule needed,
+    // so the safest fix is no rule at all -- verified against the same
+    // server.
   ];
 
   return lines.join('\n');

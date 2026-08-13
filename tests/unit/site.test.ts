@@ -47,6 +47,23 @@ describe('summarize', () => {
     expect(result.startsWith(prefix.slice(0, result.length - 1))).toBe(true);
   });
 
+  it('does not stall on a `[` that never becomes a real markdown link', () => {
+    // Regression: a leading "[TAG]" with no "](" following it used to pin
+    // the safe-cut tracker at linkDepth 1 forever, degenerating the whole
+    // summary to a bare ellipsis (real case: agent-manager's description).
+    const description =
+      '[DEPRECATED] Go-based terminal UI for managing Claude Code agent processes via tmux panes. ' +
+      'Unmaintained and no longer offered for new installs; a GUI-based replacement is being pursued instead. ' +
+      'Kept in-repo for existing users.';
+
+    const result = summarize(description);
+
+    expect(result.length).toBeLessThanOrEqual(120);
+    expect(result).not.toBe('…');
+    expect(result.startsWith('[DEPRECATED] Go-based terminal UI')).toBe(true);
+    expect(result.endsWith('…')).toBe(true);
+  });
+
   it('never splits a backtick code span', () => {
     const prefix = 'x'.repeat(105);
     const description = `${prefix} \`a-long-code-span-token\` more text after it`;

@@ -20,9 +20,17 @@
 export const INSTALL_COMMAND =
   'git clone https://github.com/lucasmccomb/ccgm.git && cd ccgm && ./start.sh';
 
-/** Same installer, non-interactive variant (`CCGM_NON_INTERACTIVE=1`). */
+/**
+ * Same installer, non-interactive variant (`CCGM_NON_INTERACTIVE=1`).
+ * Must carry an explicit `--preset`: under CCGM_NON_INTERACTIVE=1 with no
+ * `--preset`, ccgm's `ui_choose()` silently falls back to the first option
+ * and `list_preset_names()` sorts alphabetically, so an unqualified
+ * non-interactive run silently installs the 55-module `cloud-agent` preset
+ * instead of a deliberate choice. `standard` is ccgm's documented
+ * "recommended starting point".
+ */
 export const INSTALL_COMMAND_NONINTERACTIVE =
-  'git clone https://github.com/lucasmccomb/ccgm.git && cd ccgm && CCGM_NON_INTERACTIVE=1 ./start.sh';
+  'git clone https://github.com/lucasmccomb/ccgm.git && cd ccgm && CCGM_NON_INTERACTIVE=1 ./start.sh --preset standard';
 
 /** Native plugin marketplace registration command. */
 export const MARKETPLACE_ADD_COMMAND = 'claude plugin marketplace add lucasmccomb/ccgm';
@@ -135,7 +143,7 @@ export const BASH_TAB_INTRO =
   'Clone the repo and run the interactive installer. It checks prerequisites, walks you through module selection, and writes everything into ~/.claude/ (or a project-local .claude/).';
 
 export const BASH_TAB_NONINTERACTIVE_INTRO =
-  'To skip the prompts, set CCGM_NON_INTERACTIVE=1 and pass a preset name with --preset:';
+  'To skip the prompts, set CCGM_NON_INTERACTIVE=1 and pass a preset name with --preset; the example below uses standard:';
 
 export const PRESET_TABLE_INTRO =
   'Presets bundle a set of modules for a common use case. Every preset below is read from the ccgm repo\'s own presets/ directory -- nothing here is hand-authored.';

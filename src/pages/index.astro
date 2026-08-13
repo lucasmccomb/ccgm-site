@@ -11,12 +11,11 @@
  * build-time-generated banner (scripts/ascii-banner.ts ->
  * src/generated/banner.txt) as its default content.
  */
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { getCollection } from 'astro:content';
 import Base from '../layouts/Base.astro';
 import AsciiArt from '../components/AsciiArt.astro';
 import CopyButton from '../components/CopyButton.astro';
+import { loadModulesIndex } from '../lib/generated.ts';
 import {
   HERO_TAGLINE,
   INSTALL_COMMAND,
@@ -27,30 +26,12 @@ import {
   WHAT_IS_MODULE_EXPLANATION,
 } from '../lib/pagecopy.ts';
 
-interface IndexMeta {
-  moduleCount?: number;
-  categories?: Record<string, number>;
-}
-
-// See install.astro's comment on this same pattern: `import.meta.url`
-// resolves to a bundled dist/pages/ path for a *page* component during
-// `astro build`, not the source file's real location, so anchor on
-// process.cwd() (the project root) instead of a relative URL.
-const indexPath = resolve(process.cwd(), 'src', 'generated', 'modules-index.json');
-
-let meta: IndexMeta | null = null;
-if (existsSync(indexPath)) {
-  try {
-    const raw = readFileSync(indexPath, 'utf-8');
-    const parsed = JSON.parse(raw) as { meta?: IndexMeta };
-    meta = parsed.meta ?? null;
-  } catch {
-    meta = null;
-  }
-}
-
-const moduleCount = meta?.moduleCount ?? 0;
-const categoryCount = meta?.categories ? Object.keys(meta.categories).length : 0;
+// Same validated single source index.md.ts reads for the same stats --
+// a missing/malformed src/generated/modules-index.json fails the build
+// loudly instead of silently rendering a zeroed stats strip.
+const { meta } = loadModulesIndex();
+const moduleCount = meta.moduleCount;
+const categoryCount = Object.keys(meta.categories).length;
 
 const modules = await getCollection('modules');
 const [exampleModule] = [...modules].sort((a, b) => a.data.name.localeCompare(b.data.name));
@@ -61,6 +42,7 @@ const [exampleModule] = [...modules].sort((a, b) => a.data.name.localeCompare(b.
   description="A modular Claude Code configuration system. Browse modules, copy install commands, and point an agent at ccgm.dev."
 >
   <section class="hero">
+    <h1 class="sr-only">CCGM -- Claude Code God Mode</h1>
     <AsciiArt label="CCGM -- Claude Code God Mode" />
     <p class="hero__tagline">{HERO_TAGLINE}</p>
 
@@ -74,16 +56,12 @@ const [exampleModule] = [...modules].sort((a, b) => a.data.name.localeCompare(b.
     </nav>
   </section>
 
-  {
-    meta && (
-      <section class="stats" aria-label="Catalog stats">
-        <p>
-          <strong data-stat="module-count">{moduleCount}</strong> modules across{' '}
-          <strong data-stat="category-count">{categoryCount}</strong> categories.
-        </p>
-      </section>
-    )
-  }
+  <section class="stats" aria-label="Catalog stats">
+    <p>
+      <strong data-stat="module-count">{moduleCount}</strong> modules across{' '}
+      <strong data-stat="category-count">{categoryCount}</strong> categories.
+    </p>
+  </section>
 
   <section class="what-is">
     <h2>{WHAT_IS_HEADING}</h2>

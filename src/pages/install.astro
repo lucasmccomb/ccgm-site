@@ -8,11 +8,10 @@
  * non-null description (today: none do, since ccgm's
  * docs/preset-descriptions.json has not merged yet -- see E2 scope).
  */
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import Base from '../layouts/Base.astro';
 import CommandTabs from '../components/CommandTabs.astro';
 import CopyButton from '../components/CopyButton.astro';
+import { loadPresets } from '../lib/generated.ts';
 import {
   AGENT_PASTE_BLOCK,
   AGENT_TAB_INTRO,
@@ -30,31 +29,10 @@ import {
   PRESET_TABLE_INTRO,
 } from '../lib/pagecopy.ts';
 
-interface PresetRecord {
-  name: string;
-  description: string | null;
-  modules: string[];
-}
-
-// `import.meta.url`-relative resolution (SourceStamp.astro's pattern) breaks
-// here: during `astro build`'s static-route rendering, a *page* component's
-// `import.meta.url` resolves to a bundled path under dist/pages/, not the
-// real source file location, so a relative `../generated/...` URL would
-// resolve inside dist/ instead of src/. Anchor on process.cwd() (the
-// project root -- the same convention tests/unit/repo-invariants.test.ts
-// already uses for reading generated/build output) instead.
-const presetsPath = resolve(process.cwd(), 'src', 'generated', 'presets.json');
-
-let presets: PresetRecord[] = [];
-if (existsSync(presetsPath)) {
-  try {
-    const raw = readFileSync(presetsPath, 'utf-8');
-    const parsed = JSON.parse(raw) as { presets?: PresetRecord[] };
-    presets = parsed.presets ?? [];
-  } catch {
-    presets = [];
-  }
-}
+// Same validated single source install.md.ts reads for its own preset
+// table -- a missing/malformed src/generated/presets.json fails the build
+// loudly instead of silently rendering an empty table.
+const { presets } = loadPresets();
 
 const hasAnyDescription = presets.some((preset) => preset.description !== null);
 ---

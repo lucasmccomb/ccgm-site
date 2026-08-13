@@ -1,0 +1,105 @@
+---
+/**
+ * The module detail page's three co-equal install options (§5 E5): an
+ * agent prompt, the native plugin marketplace command, and manual per-file
+ * copy -- each with a one-line trust/effort annotation. Split out of
+ * [name].astro so the deprecated-status gate (§5 E5: "install strip
+ * collapsed behind an explicit 'install anyway' affordance") can wrap this
+ * exact markup in a <details> without duplicating it.
+ *
+ * The marketplace command is rendered unconditionally (marketplacePlugin
+ * is a drift signal, not a UI conditional -- §3.3/§5 E5) with the same
+ * non-parity note the install page uses (src/lib/pagecopy.ts, E4-owned;
+ * consumed here, not edited).
+ */
+import CopyButton from './CopyButton.astro';
+import { MARKETPLACE_NON_PARITY_NOTE } from '../lib/pagecopy.ts';
+import {
+  FILES_HEADING,
+  INSTALL_OPTION_AGENT_ANNOTATION,
+  INSTALL_OPTION_AGENT_LABEL,
+  INSTALL_OPTION_MANUAL_ANNOTATION,
+  INSTALL_OPTION_MANUAL_LABEL,
+  INSTALL_OPTION_MARKETPLACE_ANNOTATION,
+  INSTALL_OPTION_MARKETPLACE_LABEL,
+  agentPromptInstallThisModule,
+  marketplaceInstallCommand,
+} from '../lib/modulepagecopy.ts';
+import { SITE_URL } from '../lib/site.ts';
+import type { ModuleRecord } from '../lib/schema.ts';
+
+interface Props {
+  module: ModuleRecord;
+}
+
+const { module: mod } = Astro.props;
+
+const agentPromptId = `install-agent-prompt-${mod.name}`;
+const marketplaceCommandId = `install-marketplace-command-${mod.name}`;
+const agentPrompt = agentPromptInstallThisModule(SITE_URL, mod.name);
+const marketplaceCommand = marketplaceInstallCommand(mod.name);
+---
+
+<div class="install-strip" data-install-strip>
+  <div class="install-option" data-install-option="agent">
+    <h3>{INSTALL_OPTION_AGENT_LABEL}</h3>
+    <p class="install-option__annotation">{INSTALL_OPTION_AGENT_ANNOTATION}</p>
+    <pre id={agentPromptId} class="command-block">{agentPrompt}</pre>
+    <CopyButton targetId={agentPromptId} label={`the agent install prompt for ${mod.displayName}`} />
+  </div>
+
+  <div class="install-option" data-install-option="marketplace">
+    <h3>{INSTALL_OPTION_MARKETPLACE_LABEL}</h3>
+    <p class="install-option__annotation">{INSTALL_OPTION_MARKETPLACE_ANNOTATION}</p>
+    <pre id={marketplaceCommandId} class="command-block">{marketplaceCommand}</pre>
+    <CopyButton targetId={marketplaceCommandId} label={`the marketplace install command for ${mod.displayName}`} />
+    <p data-marketplace-non-parity-note>{MARKETPLACE_NON_PARITY_NOTE}</p>
+  </div>
+
+  <div class="install-option" data-install-option="manual">
+    <h3>{INSTALL_OPTION_MANUAL_LABEL}</h3>
+    <p class="install-option__annotation">{INSTALL_OPTION_MANUAL_ANNOTATION}</p>
+    <a href="#files">{FILES_HEADING}</a>
+  </div>
+</div>
+
+<style>
+  .install-strip {
+    display: grid;
+    gap: var(--space-unit);
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    margin: var(--space-unit) 0;
+  }
+
+  .install-option {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: var(--space-unit);
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--space-unit) * 0.5);
+  }
+
+  .install-option h3 {
+    margin: 0;
+  }
+
+  .install-option__annotation {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--color-fg);
+    opacity: 0.85;
+  }
+
+  .command-block {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: var(--space-unit);
+    font-family: var(--font-mono);
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+  }
+</style>

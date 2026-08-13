@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { LLMS_FULL_TXT_CAP_BYTES, LLMS_TXT_CAP_BYTES } from '../../src/lib/llms.ts';
+import { PER_MODULE_TWIN_CAP_BYTES } from '../../src/lib/module-twin.ts';
 
 /**
  * Size budgets (§3.4, §1.4 principle 11), asserted against the real build
@@ -80,5 +81,43 @@ describe('size budgets against dist/ (never loosened, never skipped when dist/ i
     expect(existsSync(path)).toBe(true);
     const size = statSync(path).size;
     expect(size).toBeLessThan(MODULES_JSON_CAP_BYTES);
+  });
+
+  it('every emitted /modules/{name}.md twin is under its 512 KB cap, or its Files section is links-only', () => {
+    requireDist();
+    const modulesDir = join(DIST_DIR, 'modules');
+    expect(existsSync(modulesDir)).toBe(true);
+
+    const mdFiles = readdirSync(modulesDir).filter((f) => f.endsWith('.md'));
+    expect(mdFiles.length).toBeGreaterThan(0);
+
+    const offenders: string[] = [];
+    let overCapCount = 0;
+
+    for (const file of mdFiles) {
+      const fullPath = join(modulesDir, file);
+      const size = statSync(fullPath).size;
+      if (size <= PER_MODULE_TWIN_CAP_BYTES) continue;
+
+      overCapCount++;
+      const text = readFileSync(fullPath, 'utf-8');
+      // Isolate the "## Files" section (always the last top-level
+      // section, in both twin shapes) so a fenced code example inside
+      // the module's OWN rendered README can't produce a false positive
+      // -- the under-cap/over-cap split only governs how FILES are
+      // rendered, not README content.
+      const filesSectionStart = text.indexOf('\n## Files\n');
+      expect(filesSectionStart, `${file}: no "## Files" section found`).toBeGreaterThan(-1);
+      const filesSection = text.slice(filesSectionStart);
+
+      if (filesSection.includes('```')) {
+        offenders.push(`${file}: ${size} bytes, over the ${PER_MODULE_TWIN_CAP_BYTES}-byte cap, but its Files section contains a fenced code block (not links-only)`);
+      }
+    }
+
+    expect(offenders).toEqual([]);
+    // Not asserted >0: today only commands-extra/dreaming exceed the cap; a
+    // future census delta could bring that to zero without this being a bug.
+    expect(overCapCount).toBeGreaterThanOrEqual(0);
   });
 });

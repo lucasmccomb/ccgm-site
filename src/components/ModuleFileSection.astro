@@ -1,0 +1,139 @@
+---
+/**
+ * One type-grouped collapsible section of a module's file contents (§5 E5).
+ * Native <details>/<summary> per the plan's own suggestion ("the simplest
+ * full solution"). Each file gets its own entry: merge-fragment and
+ * placeholder annotations when applicable, full content + CopyButton when
+ * the page's inline budget included it, otherwise a bounded preview plus a
+ * raw-text link and a fetch-based CopyButton (byte-exact without bloating
+ * page weight -- see CopyButton.astro's sourceUrl mode, §5 E5).
+ */
+import CopyButton from './CopyButton.astro';
+import { MERGE_FRAGMENT_ANNOTATION, MERGE_FRAGMENT_COPY_LABEL, PLACEHOLDER_ANNOTATION } from '../lib/modulepagecopy.ts';
+import type { ContentFile } from '../lib/schema.ts';
+
+interface Props {
+  type: string;
+  files: ContentFile[];
+  inlinedPaths: Set<string>;
+  moduleName: string;
+}
+
+const { type, files, inlinedPaths, moduleName } = Astro.props;
+
+const PREVIEW_CHARS = 800;
+
+function previewOf(content: string): string {
+  return content.length <= PREVIEW_CHARS ? content : `${content.slice(0, PREVIEW_CHARS)}…`;
+}
+
+function safeId(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]/g, '-');
+}
+---
+
+<details class="file-type-section" data-file-type-section data-file-type={type}>
+  <summary>{type} ({files.length})</summary>
+  <div class="file-type-section__files">
+    {
+      files.map((file) => {
+        const inlined = inlinedPaths.has(file.path);
+        const domId = `file-${safeId(moduleName)}-${safeId(file.path)}`;
+        const headingId = `${domId}-heading`;
+        const copyIdleLabel = file.isMergeFragment ? MERGE_FRAGMENT_COPY_LABEL : undefined;
+
+        return (
+          <div
+            class="file-entry"
+            data-file-entry
+            data-file-path={file.path}
+            data-file-merge={file.isMergeFragment ? 'true' : 'false'}
+            data-file-placeholder={file.hasSubstitutionPlaceholders ? 'true' : 'false'}
+            data-file-inlined={inlined ? 'true' : 'false'}
+          >
+            <h4 class="file-entry__path" id={headingId}>{file.path}</h4>
+            {file.isMergeFragment && <p data-merge-annotation>{MERGE_FRAGMENT_ANNOTATION}</p>}
+            {file.hasSubstitutionPlaceholders && <p data-placeholder-annotation>{PLACEHOLDER_ANNOTATION}</p>}
+            {inlined ? (
+              <Fragment>
+                {/* No whitespace/newlines between the tags and the expression below --
+                    <pre> preserves it literally, which would corrupt the byte-exact copy.
+                    tabindex="0" + aria-labelledby: this <pre> scrolls (overflow-x on long
+                    lines, overflow-y past max-height) and must be keyboard/AT reachable
+                    (WCAG 2.1.1, axe scrollable-region-focusable) -- same fix as the
+                    README-rendered <pre> in [name].astro. */}
+                <pre id={domId} tabindex="0" aria-labelledby={headingId} class="file-entry__body">{file.content}</pre>
+                <CopyButton targetId={domId} label={file.path} idleLabel={copyIdleLabel} />
+              </Fragment>
+            ) : (
+              <Fragment>
+                <pre
+                  tabindex="0"
+                  aria-labelledby={headingId}
+                  class="file-entry__body file-entry__body--preview"
+                  data-file-preview
+                >{previewOf(file.content)}</pre>
+                <p>
+                  <a href={file.rawUrl} data-file-raw-link>
+                    View raw ({file.bytes} bytes)
+                  </a>
+                </p>
+                <CopyButton sourceUrl={file.rawUrl} label={file.path} idleLabel={copyIdleLabel} />
+              </Fragment>
+            )}
+          </div>
+        );
+      })
+    }
+  </div>
+</details>
+
+<style>
+  .file-type-section {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: var(--space-unit);
+    margin-bottom: calc(var(--space-unit) * 0.5);
+  }
+
+  .file-type-section summary {
+    font-weight: 600;
+    font-family: var(--font-mono);
+  }
+
+  .file-type-section__files {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-unit);
+    margin-top: var(--space-unit);
+  }
+
+  .file-entry {
+    border-top: 1px solid var(--color-border);
+    padding-top: var(--space-unit);
+  }
+
+  .file-entry__path {
+    font-family: var(--font-mono);
+    font-size: 0.9375rem;
+    margin: 0 0 calc(var(--space-unit) * 0.5) 0;
+    word-break: break-all;
+  }
+
+  .file-entry__body {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: var(--space-unit);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    overflow-x: auto;
+    white-space: pre;
+    max-height: 24rem;
+    overflow-y: auto;
+  }
+
+  .file-entry__body--preview {
+    white-space: pre-wrap;
+  }
+</style>

@@ -1,0 +1,130 @@
+---
+/**
+ * Module catalog (§5 E5). Category sections (the 5-value CATEGORY_VALUES
+ * enum, with counts) are the primary discovery surface -- always rendered,
+ * even for a category with zero members today, so "5 categories" is a
+ * structural guarantee, not a byte-count coincidence. Tag filter chips are
+ * progressive enhancement: every card is already visible and grouped by
+ * category with no JavaScript at all; src/scripts/module-filter.ts adds
+ * client-side filtering when it runs.
+ */
+import { getCollection } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import ModuleCard from '../../components/ModuleCard.astro';
+import { CATEGORY_VALUES } from '../../lib/schema.ts';
+import {
+  CATALOG_DESCRIPTION,
+  CATALOG_EMPTY_STATE_TEXT,
+  CATALOG_HEADING,
+  CATALOG_TITLE,
+  TAG_FILTER_CLEAR_LABEL,
+  TAG_FILTER_LABEL,
+  TAG_FILTER_NO_JS_NOTE,
+  catalogStatsLine,
+  categoryHeading,
+} from '../../lib/modulepagecopy.ts';
+
+const collection = await getCollection('modules');
+const modules = [...collection].sort((a, b) => a.data.name.localeCompare(b.data.name));
+
+const byCategory = new Map<string, typeof modules>(CATEGORY_VALUES.map((category) => [category, []]));
+for (const mod of modules) {
+  const list = byCategory.get(mod.data.category);
+  if (list) list.push(mod);
+}
+
+const allTags = [...new Set(modules.flatMap((mod) => mod.data.tags))].sort((a, b) => a.localeCompare(b));
+---
+
+<Base title={CATALOG_TITLE} description={CATALOG_DESCRIPTION}>
+  <h1>{CATALOG_HEADING}</h1>
+  <p data-catalog-stats>{catalogStatsLine(modules.length, CATEGORY_VALUES.length)}</p>
+
+  {
+    allTags.length > 0 && (
+      <div class="tag-filter">
+        <div role="group" aria-label={TAG_FILTER_LABEL} data-tag-filter class="tag-filter__chips">
+          {allTags.map((tag) => (
+            <button type="button" data-tag-chip data-tag={tag} aria-pressed="false" class="tag-chip">
+              {tag}
+            </button>
+          ))}
+        </div>
+        <button type="button" data-tag-filter-clear class="tag-filter__clear">
+          {TAG_FILTER_CLEAR_LABEL}
+        </button>
+        <p class="sr-only">{TAG_FILTER_NO_JS_NOTE}</p>
+      </div>
+    )
+  }
+
+  <p data-catalog-empty hidden class="catalog-empty">{CATALOG_EMPTY_STATE_TEXT}</p>
+
+  {
+    CATEGORY_VALUES.map((category) => {
+      const mods = byCategory.get(category) ?? [];
+      return (
+        <section data-category-section data-category={category} data-category-count={mods.length} aria-labelledby={`category-${category}`}>
+          <h2 id={`category-${category}`}>{categoryHeading(category, mods.length)}</h2>
+          <div class="module-grid">
+            {mods.map((mod) => (
+              <ModuleCard module={mod.data} />
+            ))}
+          </div>
+        </section>
+      );
+    })
+  }
+</Base>
+
+<script>
+  import '../../scripts/module-filter.ts';
+</script>
+
+<style>
+  .tag-filter {
+    margin: var(--space-unit) 0 calc(var(--space-unit) * 2) 0;
+  }
+
+  .tag-filter__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--space-unit) * 0.5);
+  }
+
+  .tag-chip {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface-1);
+    color: var(--color-fg);
+    padding: calc(var(--space-unit) * 0.25) calc(var(--space-unit) * 0.75);
+    font: inherit;
+    font-size: 0.8125rem;
+  }
+
+  .tag-chip[aria-pressed='true'] {
+    border-color: var(--color-accent);
+    background: var(--color-surface-2);
+  }
+
+  .tag-filter__clear {
+    margin-top: calc(var(--space-unit) * 0.5);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--color-fg);
+    padding: calc(var(--space-unit) * 0.25) calc(var(--space-unit) * 0.75);
+    font: inherit;
+    font-size: 0.8125rem;
+  }
+
+  section[data-category-section] {
+    margin-bottom: calc(var(--space-unit) * 2);
+  }
+
+  .module-grid {
+    display: grid;
+    gap: var(--space-unit);
+    grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  }
+</style>

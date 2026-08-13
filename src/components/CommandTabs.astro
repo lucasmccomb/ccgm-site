@@ -17,6 +17,17 @@ interface Props {
 }
 
 const { tabs, groupId, ariaLabel, defaultTab = tabs[0]?.id } = Astro.props;
+
+// Astro requires slot outlets to have a statically-known name, so
+// `<slot name={tab.id} />` cannot live inside a `tabs.map()` in the
+// template below (`slot[name] must be a static string` at compile time).
+// `Astro.slots.render()` is the documented workaround: it resolves a
+// dynamically-named slot at render time, so panel content stays fully
+// caller-driven (Fragment slots named per tab.id) while the component
+// itself supports an arbitrary, caller-supplied tab list.
+const panels = await Promise.all(
+  tabs.map(async (tab) => ({ tab, html: await Astro.slots.render(tab.id) })),
+);
 ---
 
 <div class="command-tabs" data-command-tabs id={groupId}>
@@ -39,7 +50,7 @@ const { tabs, groupId, ariaLabel, defaultTab = tabs[0]?.id } = Astro.props;
     }
   </div>
   {
-    tabs.map((tab) => (
+    panels.map(({ tab, html }) => (
       <div
         role="tabpanel"
         id={`${groupId}-panel-${tab.id}`}
@@ -47,9 +58,8 @@ const { tabs, groupId, ariaLabel, defaultTab = tabs[0]?.id } = Astro.props;
         hidden={tab.id !== defaultTab}
         data-tab-panel={tab.id}
         class="command-tabs__panel"
-      >
-        <slot name={tab.id} />
-      </div>
+        set:html={html}
+      />
     ))
   }
 </div>

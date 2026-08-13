@@ -1,0 +1,149 @@
+---
+/**
+ * Install page (E4): four install paths as CommandTabs.
+ *
+ * The preset table is rendered entirely from src/generated/presets.json --
+ * never hand-authored (§1.4 principle 2, E4 acceptance criterion). The
+ * description column only appears once at least one preset carries a
+ * non-null description (today: none do, since ccgm's
+ * docs/preset-descriptions.json has not merged yet -- see E2 scope).
+ */
+import Base from '../layouts/Base.astro';
+import CommandTabs from '../components/CommandTabs.astro';
+import CopyButton from '../components/CopyButton.astro';
+import { loadPresets } from '../lib/generated.ts';
+import {
+  AGENT_PASTE_BLOCK,
+  AGENT_TAB_INTRO,
+  BASH_TAB_INTRO,
+  BASH_TAB_NONINTERACTIVE_INTRO,
+  INSTALL_COMMAND,
+  INSTALL_COMMAND_NONINTERACTIVE,
+  INSTALL_TABS,
+  MANUAL_TAB_CATALOG_LINK_LABEL,
+  MANUAL_TAB_INTRO,
+  MARKETPLACE_ADD_COMMAND,
+  MARKETPLACE_INSTALL_EXAMPLE_COMMAND,
+  MARKETPLACE_NON_PARITY_NOTE,
+  MARKETPLACE_TAB_INTRO,
+  PRESET_TABLE_INTRO,
+} from '../lib/pagecopy.ts';
+
+// Same validated single source install.md.ts reads for its own preset
+// table -- a missing/malformed src/generated/presets.json fails the build
+// loudly instead of silently rendering an empty table.
+const { presets } = loadPresets();
+
+const hasAnyDescription = presets.some((preset) => preset.description !== null);
+---
+
+<Base
+  title="Install -- CCGM"
+  description="Four ways to install CCGM: the bash installer with presets, an agent-paste block, the native plugin marketplace, or manual per-module copy."
+>
+  <h1>Install</h1>
+
+  <CommandTabs tabs={INSTALL_TABS} groupId="install-tabs" ariaLabel="Install paths">
+    <Fragment slot="bash">
+      <p>{BASH_TAB_INTRO}</p>
+
+      <pre id="install-command-bash" class="command-block">{INSTALL_COMMAND}</pre>
+      <CopyButton targetId="install-command-bash" label="the bash install command" />
+
+      <p>{BASH_TAB_NONINTERACTIVE_INTRO}</p>
+      <pre id="install-command-noninteractive" class="command-block">{INSTALL_COMMAND_NONINTERACTIVE}</pre>
+      <CopyButton targetId="install-command-noninteractive" label="the non-interactive install command" />
+
+      <h2>Presets</h2>
+      <p>{PRESET_TABLE_INTRO}</p>
+
+      {
+        presets.length > 0 && (
+          <table data-preset-table>
+            <thead>
+              <tr>
+                <th>Preset</th>
+                <th>Modules</th>
+                <th>Module list</th>
+                {hasAnyDescription && <th>Description</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {presets.map((preset) => (
+                <tr
+                  data-preset-row
+                  data-preset-name={preset.name}
+                  data-preset-module-count={preset.modules.length}
+                >
+                  <td>
+                    <code>{preset.name}</code>
+                  </td>
+                  <td>{preset.modules.length}</td>
+                  <td data-preset-modules>{preset.modules.join(', ')}</td>
+                  {hasAnyDescription && (
+                    <td data-preset-description={preset.description ?? undefined}>
+                      {preset.description ?? ''}
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )
+      }
+    </Fragment>
+
+    <Fragment slot="agent">
+      <p>{AGENT_TAB_INTRO}</p>
+      <pre id="install-command-agent" class="command-block">{AGENT_PASTE_BLOCK}</pre>
+      <CopyButton targetId="install-command-agent" label="the agent-paste install block" />
+    </Fragment>
+
+    <Fragment slot="marketplace">
+      <p>{MARKETPLACE_TAB_INTRO}</p>
+
+      <pre id="install-command-marketplace" class="command-block">{MARKETPLACE_ADD_COMMAND}</pre>
+      <CopyButton targetId="install-command-marketplace" label="the marketplace add command" />
+
+      <pre id="install-command-marketplace-example" class="command-block">{MARKETPLACE_INSTALL_EXAMPLE_COMMAND}</pre>
+      <CopyButton
+        targetId="install-command-marketplace-example"
+        label="the marketplace install-a-module example command"
+      />
+
+      <p data-non-parity-note>{MARKETPLACE_NON_PARITY_NOTE}</p>
+    </Fragment>
+
+    <Fragment slot="manual">
+      <p>{MANUAL_TAB_INTRO}</p>
+      <a href="/modules">{MANUAL_TAB_CATALOG_LINK_LABEL}</a>
+    </Fragment>
+  </CommandTabs>
+</Base>
+
+<style>
+  .command-block {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: var(--space-unit);
+    font-family: var(--font-mono);
+    overflow-x: auto;
+    white-space: pre;
+    margin: var(--space-unit) 0 calc(var(--space-unit) * 0.5) 0;
+  }
+
+  table[data-preset-table] {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: var(--space-unit);
+  }
+
+  table[data-preset-table] th,
+  table[data-preset-table] td {
+    border: 1px solid var(--color-border);
+    padding: calc(var(--space-unit) * 0.5) var(--space-unit);
+    text-align: left;
+    vertical-align: top;
+  }
+</style>

@@ -1,19 +1,40 @@
 ---
 /**
- * Placeholder landing page (E1). Enough surface to exercise the smoke
- * spec, CopyButton E2E, and header assertions -- E4 (wave 2) replaces this
- * with the real hero, "what is CCGM" section, and stats strip driven by
- * scripts/ingest.ts's real output.
+ * Landing page (E4). Hero + "what is CCGM" section + stats strip.
+ *
+ * Stats and the concrete module example are read from the ingested
+ * collection (never hand-authored, §1.4 principle 2) -- this page renders
+ * correctly whether the build ran against E1's fixture stub (3 modules) or
+ * the real ccgm repo (78+ modules, once E2 lands).
  *
  * AsciiArt is used without an explicit `art` prop (E3): it self-loads the
  * build-time-generated banner (scripts/ascii-banner.ts ->
  * src/generated/banner.txt) as its default content.
  */
+import { getCollection } from 'astro:content';
 import Base from '../layouts/Base.astro';
 import AsciiArt from '../components/AsciiArt.astro';
 import CopyButton from '../components/CopyButton.astro';
+import { loadModulesIndex } from '../lib/generated.ts';
+import {
+  HERO_TAGLINE,
+  INSTALL_COMMAND,
+  INSTALL_PATHS_OVERVIEW,
+  WHAT_IS_EXAMPLE_LEAD,
+  WHAT_IS_HEADING,
+  WHAT_IS_INTRO,
+  WHAT_IS_MODULE_EXPLANATION,
+} from '../lib/pagecopy.ts';
 
-const installCommand = 'git clone https://github.com/lucasmccomb/ccgm.git && cd ccgm && ./start.sh';
+// Same validated single source index.md.ts reads for the same stats --
+// a missing/malformed src/generated/modules-index.json fails the build
+// loudly instead of silently rendering a zeroed stats strip.
+const { meta } = loadModulesIndex();
+const moduleCount = meta.moduleCount;
+const categoryCount = Object.keys(meta.categories).length;
+
+const modules = await getCollection('modules');
+const [exampleModule] = [...modules].sort((a, b) => a.data.name.localeCompare(b.data.name));
 ---
 
 <Base
@@ -21,11 +42,54 @@ const installCommand = 'git clone https://github.com/lucasmccomb/ccgm.git && cd 
   description="A modular Claude Code configuration system. Browse modules, copy install commands, and point an agent at ccgm.dev."
 >
   <section class="hero">
+    <h1 class="sr-only">CCGM -- Claude Code God Mode</h1>
     <AsciiArt label="CCGM -- Claude Code God Mode" />
-    <p class="hero__tagline">A modular configuration system for Claude Code.</p>
+    <p class="hero__tagline">{HERO_TAGLINE}</p>
 
-    <pre id="install-command" class="hero__command">{installCommand}</pre>
+    <pre id="install-command" class="hero__command">{INSTALL_COMMAND}</pre>
     <CopyButton targetId="install-command" label="the install command" />
+
+    <nav class="hero__links" aria-label="Site sections">
+      <a href="/install">Install</a>
+      <a href="/agents">For agents</a>
+      <a href="/modules">Browse modules</a>
+    </nav>
+  </section>
+
+  <section class="stats" aria-label="Catalog stats">
+    <p>
+      <strong data-stat="module-count">{moduleCount}</strong> modules across{' '}
+      <strong data-stat="category-count">{categoryCount}</strong> categories.
+    </p>
+  </section>
+
+  <section class="what-is">
+    <h2>{WHAT_IS_HEADING}</h2>
+    <p>{WHAT_IS_INTRO}</p>
+    <p>{WHAT_IS_MODULE_EXPLANATION}</p>
+
+    <ul class="install-paths" data-install-paths>
+      {
+        INSTALL_PATHS_OVERVIEW.map((path) => (
+          <li>
+            <a href={path.href}>{path.name}</a>
+            <p>{path.description}</p>
+          </li>
+        ))
+      }
+    </ul>
+
+    {
+      exampleModule && (
+        <div class="example-module" data-example-module>
+          <p>{WHAT_IS_EXAMPLE_LEAD}</p>
+          <div class="example-module__card">
+            <p class="example-module__name">{exampleModule.data.displayName}</p>
+            <p>{exampleModule.data.summary}</p>
+          </div>
+        </div>
+      )
+    }
   </section>
 </Base>
 
@@ -48,5 +112,47 @@ const installCommand = 'git clone https://github.com/lucasmccomb/ccgm.git && cd 
     border-radius: var(--radius);
     padding: var(--space-unit);
     font-family: var(--font-mono);
+  }
+
+  .hero__links {
+    display: flex;
+    gap: calc(var(--space-unit) * 2);
+  }
+
+  .stats {
+    margin-top: calc(var(--space-unit) * 2);
+  }
+
+  .what-is {
+    margin-top: calc(var(--space-unit) * 3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-unit);
+  }
+
+  .install-paths {
+    display: grid;
+    gap: var(--space-unit);
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .install-paths li {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: var(--space-unit);
+  }
+
+  .example-module__card {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: var(--space-unit);
+    background: var(--color-surface-1);
+  }
+
+  .example-module__name {
+    font-family: var(--font-mono);
+    font-weight: 700;
   }
 </style>

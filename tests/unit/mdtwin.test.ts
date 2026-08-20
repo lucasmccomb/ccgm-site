@@ -6,11 +6,13 @@ describe('mdTwinUrlFor', () => {
     expect(mdTwinUrlFor('/')).toBe('/index.md');
   });
 
-  it('maps install and agents, with or without a trailing slash', () => {
+  it('maps install, agents, and diagrams, with or without a trailing slash', () => {
     expect(mdTwinUrlFor('/install')).toBe('/install.md');
     expect(mdTwinUrlFor('/install/')).toBe('/install.md');
     expect(mdTwinUrlFor('/agents')).toBe('/agents.md');
     expect(mdTwinUrlFor('/agents/')).toBe('/agents.md');
+    expect(mdTwinUrlFor('/diagrams')).toBe('/diagrams.md');
+    expect(mdTwinUrlFor('/diagrams/')).toBe('/diagrams.md');
   });
 
   it('maps the module catalog to its own index twin, not a module named "index"', () => {

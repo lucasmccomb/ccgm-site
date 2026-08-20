@@ -58,6 +58,11 @@ export function defaultDocEntries(siteUrl: string): DocEntry[] {
       url: `${siteUrl}/examples.md`,
       description: 'Representative slash-command sessions: what you type, what happens, and what it prints, traced to source.',
     },
+    {
+      title: 'System diagrams',
+      url: `${siteUrl}/diagrams.md`,
+      description: 'Install flow, module anatomy, hook gate pipeline, worktree lifecycle, and the learnings loop.',
+    },
   ];
 }
 

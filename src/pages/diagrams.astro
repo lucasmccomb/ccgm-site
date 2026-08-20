@@ -1,0 +1,41 @@
+---
+/**
+ * Diagrams page (#24): the five system maps.
+ *
+ * The traceability links are resolved at build time against THIS build's
+ * ingested index and sourceSha -- never hand-authored URLs. A path inside a
+ * module the build actually ingested links to that module's page here; a
+ * repo-root file links to a SHA-pinned GitHub blob (§1.4 principle 15),
+ * which stays resolvable no matter what ccgm renames later.
+ */
+import Base from '../layouts/Base.astro';
+import Diagram from '../components/Diagram.astro';
+import { loadModulesIndex } from '../lib/generated.ts';
+import { SITE_URL } from '../lib/site.ts';
+import {
+  DIAGRAMS,
+  DIAGRAMS_DESCRIPTION,
+  DIAGRAMS_HEADING,
+  DIAGRAMS_INTRO,
+  DIAGRAMS_TITLE,
+  DIAGRAMS_TRACEABILITY_NOTE,
+  resolveRefs,
+} from '../lib/diagrams.ts';
+
+const { meta, modules } = loadModulesIndex();
+const options = {
+  sourceSha: meta.sourceSha,
+  siteUrl: SITE_URL,
+  knownModules: new Set(modules.map((mod) => mod.name)),
+};
+
+const diagrams = DIAGRAMS.map((spec) => ({ spec, refs: resolveRefs(spec.refs, options) }));
+---
+
+<Base title={DIAGRAMS_TITLE} description={DIAGRAMS_DESCRIPTION}>
+  <h1>{DIAGRAMS_HEADING}</h1>
+  <p data-diagrams-intro>{DIAGRAMS_INTRO}</p>
+  <p data-diagrams-note>{DIAGRAMS_TRACEABILITY_NOTE}</p>
+
+  {diagrams.map(({ spec, refs }) => <Diagram spec={spec} refs={refs} />)}
+</Base>

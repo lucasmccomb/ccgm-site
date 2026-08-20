@@ -1,0 +1,329 @@
+---
+/**
+ * Renders one DiagramSpec (#24) as inline SVG plus its image-free fallback.
+ *
+ * Structural constraints this component is written around:
+ *  - **No inline `<style>` in dist.** The `<style>` block below is an Astro
+ *    scoped stylesheet, extracted to an external file by
+ *    `build.inlineStylesheets: 'never'` -- the same mechanism every other
+ *    page here uses. Every SVG element is authored in this template (never
+ *    via `set:html`) so Astro's scope attribute actually reaches it.
+ *  - **No inline `<script>`.** Nothing here is client-rendered; the SVG is
+ *    in the served HTML and works with JavaScript disabled.
+ *  - **No colour of its own.** Strokes and fills resolve to `--color-fg` /
+ *    `--color-surface-*`, so a diagram is a quiet line drawing under `mono`
+ *    and still legible under `ascii`, `minimal`, and `serif`.
+ *
+ * The SVG renders at its natural viewBox width inside an `overflow-x`
+ * container rather than scaling to 100%: scaling a 560-unit drawing into a
+ * 311px column would render 10px labels at under 6px. The container carries
+ * `tabindex="0"` for the same reason every command `<pre>` on this site does
+ * -- axe's `scrollable-region-focusable` rule fires once it actually
+ * scrolls, which it does at 375px.
+ *
+ * A11y: `role="img"` + `aria-labelledby` pointing at the SVG's own `<title>`
+ * (the accessible name) and `<desc>` (what the drawing looks like). That
+ * makes the subtree presentational, so the `<text>` runs are never read out
+ * raw. The real content is the ordered step list in the `<figcaption>`,
+ * which is different prose, not a restatement of the description.
+ */
+import {
+  BASELINE_OFFSET,
+  DIAGRAMS_TRACEABILITY_LABEL,
+  LINE_HEIGHT,
+  type DiagramNode,
+  type DiagramSpec,
+  type ResolvedRef,
+} from '../lib/diagrams.ts';
+
+interface Props {
+  spec: DiagramSpec;
+  refs: ResolvedRef[];
+}
+
+const { spec, refs } = Astro.props;
+
+interface TextLine {
+  text: string;
+  y: number;
+  meta: boolean;
+}
+
+/**
+ * Vertically centre a node's text block. The label (body face) comes first,
+ * then each `sub` line (mono face) -- one line height apart, so a one-line
+ * and a three-line node share the same optical centre.
+ */
+function textLines(node: DiagramNode): TextLine[] {
+  const entries: { text: string; meta: boolean }[] = [
+    ...(node.label ? [{ text: node.label, meta: false }] : []),
+    ...(node.sub ?? []).map((text) => ({ text, meta: true })),
+  ];
+  const blockHeight = entries.length * LINE_HEIGHT;
+  const first = node.y + (node.h - blockHeight) / 2 + BASELINE_OFFSET;
+  return entries.map((entry, index) => ({ ...entry, y: first + index * LINE_HEIGHT }));
+}
+
+function nodeClass(node: DiagramNode): string {
+  return `diagram__node diagram__node--${node.kind ?? 'box'}`;
+}
+
+const arrowId = `${spec.id}-arrow`;
+const titleId = `${spec.id}-title`;
+const descId = `${spec.id}-desc`;
+---
+
+<section class="diagram" data-diagram={spec.id} aria-labelledby={`${spec.id}-heading`}>
+  <h2 id={`${spec.id}-heading`}>{spec.heading}</h2>
+  <p class="diagram__summary">{spec.summary}</p>
+
+  <figure class="diagram__figure">
+    <div class="diagram__scroll" tabindex="0">
+      <svg
+        class="diagram__svg"
+        role="img"
+        aria-labelledby={`${titleId} ${descId}`}
+        viewBox={`0 0 ${spec.width} ${spec.height}`}
+        width={spec.width}
+        height={spec.height}
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <title id={titleId}>{spec.title}</title>
+        <desc id={descId}>{spec.desc}</desc>
+        <defs>
+          <marker
+            id={arrowId}
+            viewBox="0 0 8 8"
+            refX="7"
+            refY="4"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto-start-reverse"
+          >
+            <path class="diagram__arrowhead" d="M 0 1 L 7 4 L 0 7 z" />
+          </marker>
+        </defs>
+
+        {
+          spec.nodes.map((node) => (
+            <rect class={nodeClass(node)} x={node.x} y={node.y} width={node.w} height={node.h} rx="2" />
+          ))
+        }
+
+        {
+          spec.edges.map((edge) => (
+            <polyline
+              class={`diagram__edge${edge.dashed ? ' diagram__edge--dashed' : ''}`}
+              points={edge.points.map(([x, y]) => `${x},${y}`).join(' ')}
+              marker-end={`url(#${arrowId})`}
+            />
+          ))
+        }
+
+        {
+          spec.nodes.flatMap((node) =>
+            textLines(node).map((line) => (
+              <text
+                class={line.meta ? 'diagram__meta' : 'diagram__label'}
+                x={node.x + node.w / 2}
+                y={line.y}
+                text-anchor="middle"
+              >
+                {line.text}
+              </text>
+            )),
+          )
+        }
+
+        {
+          (spec.captions ?? []).map((caption) => (
+            <text
+              class="diagram__meta"
+              x={caption.x}
+              y={caption.y}
+              text-anchor={caption.anchor ?? 'start'}
+            >
+              {caption.text}
+            </text>
+          ))
+        }
+      </svg>
+    </div>
+
+    <figcaption class="diagram__fallback">
+      <ol class="diagram__steps">
+        {spec.steps.map((step) => <li>{step}</li>)}
+      </ol>
+    </figcaption>
+  </figure>
+
+  <p class="diagram__legend-label" id={`${spec.id}-refs`}>{DIAGRAMS_TRACEABILITY_LABEL}</p>
+  <ul class="diagram__legend" aria-labelledby={`${spec.id}-refs`} data-diagram-legend={spec.id}>
+    {
+      refs.map((ref) => (
+        <li>
+          <a href={ref.href} data-diagram-ref={ref.path}>
+            <code>{ref.path}</code>
+          </a>
+          <span class="diagram__legend-role">{ref.role}</span>
+        </li>
+      ))
+    }
+  </ul>
+</section>
+
+<style>
+  .diagram {
+    margin-top: calc(var(--space-unit) * 3);
+  }
+
+  /*
+   * The fallback prose and the legend both quote real paths --
+   * `~/.claude/learnings/{project-slug}/agents/{agent-id}.jsonl` is one
+   * unbreakable 57-character word. Left alone it forces page-level
+   * horizontal overflow at 375px in whichever theme has the widest body
+   * face (ascii's JetBrains Mono and serif's 17px Inter both did; mono's
+   * Helvetica did not, which is exactly why this needs a rule rather than
+   * a lucky default).
+   */
+  .diagram__summary,
+  .diagram__steps li,
+  .diagram__legend li {
+    overflow-wrap: break-word;
+  }
+
+  .diagram__summary {
+    max-width: var(--measure);
+  }
+
+  .diagram__figure {
+    margin: var(--space-unit) 0;
+  }
+
+  /*
+   * The SVG keeps its natural width so 10px labels stay 10px; the container
+   * is what yields at narrow viewports. `min-width: 0` + `max-width: 100%`
+   * together are what stop a wide child forcing page-level overflow inside
+   * a shrink-to-fit parent -- the same pair global.css applies to <pre>.
+   */
+  .diagram__scroll {
+    overflow-x: auto;
+    max-width: 100%;
+    min-width: 0;
+    border: 1px solid var(--color-border);
+    padding: var(--space-unit);
+    box-sizing: border-box;
+  }
+
+  .diagram__svg {
+    display: block;
+  }
+
+  /*
+   * Every stroke and fill below is derived from --color-fg rather than set
+   * to a literal, so the drawing inherits whatever contrast the active
+   * theme guarantees for its own body text. --color-border is deliberately
+   * not used for the drawing itself: under `mono` it is a #e6e6e6 hairline
+   * chosen for separators against a #fcfcfc canvas, which would leave the
+   * boxes effectively invisible.
+   */
+  .diagram__node {
+    fill: none;
+    stroke: var(--color-fg);
+    stroke-opacity: 0.3;
+    stroke-width: 1;
+  }
+
+  .diagram__node--soft {
+    fill: var(--color-surface-2);
+  }
+
+  .diagram__node--group {
+    stroke-opacity: 0.22;
+    stroke-dasharray: 3 3;
+  }
+
+  .diagram__edge {
+    fill: none;
+    stroke: var(--color-fg);
+    stroke-opacity: 0.45;
+    stroke-width: 1;
+  }
+
+  .diagram__edge--dashed {
+    stroke-dasharray: 4 3;
+  }
+
+  .diagram__arrowhead {
+    fill: var(--color-fg);
+    fill-opacity: 0.45;
+  }
+
+  .diagram__label {
+    fill: var(--color-fg);
+    font-family: var(--font-body);
+    font-size: 12px;
+  }
+
+  .diagram__meta {
+    fill: var(--color-fg);
+    fill-opacity: 0.66;
+    font-family: var(--font-mono);
+    font-size: 10px;
+  }
+
+  .diagram__fallback {
+    margin: var(--space-unit) 0 0 0;
+  }
+
+  .diagram__steps {
+    max-width: var(--measure);
+    margin: 0;
+    padding-left: calc(var(--space-unit) * 1.5);
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--space-unit) * 0.5);
+  }
+
+  .diagram__legend-label {
+    margin-bottom: 0;
+    font-weight: 500;
+  }
+
+  /* Hairline rows, not boxes -- the same treatment the catalog gives a
+     module row (#21), so the legend reads as part of the page's rhythm. */
+  .diagram__legend {
+    list-style: none;
+    padding: 0;
+    margin: calc(var(--space-unit) * 0.5) 0 0 0;
+    max-width: var(--measure);
+  }
+
+  .diagram__legend li {
+    border-bottom: 1px solid var(--color-border);
+    padding: calc(var(--space-unit) * 0.5) 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--space-unit) * 0.5);
+    align-items: baseline;
+  }
+
+  /* A flex item's default min-width is `auto` -- "never shrink below your
+     own content's preferred width" -- so a long path would keep the row at
+     its full unbroken width no matter what the block-level wrap rule says.
+     `min-width: 0` removes that floor and `overflow-wrap: anywhere` is the
+     one wrap value that also lowers the intrinsic minimum. */
+  .diagram__legend li > * {
+    min-width: 0;
+  }
+
+  .diagram__legend code {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    overflow-wrap: anywhere;
+  }
+
+  .diagram__legend-role {
+    font-size: 0.875rem;
+  }
+</style>

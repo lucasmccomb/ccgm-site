@@ -1,11 +1,39 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
+import { DEFAULT_THEME } from '../src/lib/site.ts';
 
+/**
+ * The shipped default is asserted from DEFAULT_THEME, never from a literal
+ * theme name (#21): the constant in src/lib/site.ts is the single place
+ * the default is declared, and these tests fail the moment the served HTML
+ * stops matching it.
+ */
+
+/**
+ * global.css's neutral `:root` placeholder value for `--layout-max`, read
+ * out of the stylesheet rather than copied here. No theme layer sets it, so
+ * a page still reporting it is a page where no token block applied at all.
+ *
+ * Reading it keeps the assertion honest: a hardcoded '72rem' would quietly
+ * become always-true the day someone edits that placeholder -- which is the
+ * exact failure the assertion exists to catch.
+ */
+function unthemedPlaceholderLayoutMax(): string {
+  const cssPath = join(process.cwd(), 'src', 'styles', 'global.css');
+  const css = readFileSync(cssPath, 'utf-8');
+  const match = /:root\s*\{[^}]*?--layout-max:\s*([^;]+);/.exec(css);
+  if (!match) {
+    throw new Error(`no :root --layout-max declaration found in ${cssPath}`);
+  }
+  return match[1].trim();
+}
 test.describe('smoke', () => {
-  test('served HTML carries data-theme before any JavaScript runs', async ({ request }) => {
+  test('served HTML carries the DEFAULT_THEME data-theme before any JavaScript runs', async ({ request }) => {
     const response = await request.get('/');
     expect(response.ok()).toBeTruthy();
     const html = await response.text();
-    expect(html).toContain('data-theme="ascii"');
+    expect(html).toContain(`data-theme="${DEFAULT_THEME}"`);
   });
 
   test('default theme survives with JavaScript disabled', async ({ browser }) => {
@@ -14,14 +42,22 @@ test.describe('smoke', () => {
     await page.goto('/');
 
     const dataTheme = await page.locator('html').getAttribute('data-theme');
-    expect(dataTheme).toBe('ascii');
+    expect(dataTheme).toBe(DEFAULT_THEME);
 
+    // A themed canvas, not the transparent default an unstyled element
+    // would report: the token layer is applied by the statically rendered
+    // data-theme, with no script involved.
     const backgroundColor = await page.evaluate(
       () => getComputedStyle(document.documentElement).backgroundColor,
     );
-    // The neutral placeholder token set is opaque white -- not the
-    // transparent default an unstyled element would report.
     expect(backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
+
+    // And the theme's OWN token block won, not global.css's neutral
+    // `:root` placeholder.
+    const layoutMax = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--layout-max').trim(),
+    );
+    expect(layoutMax).not.toBe(unthemedPlaceholderLayoutMax());
 
     await context.close();
   });

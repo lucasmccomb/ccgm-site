@@ -181,11 +181,22 @@ consider `/get.sh` instead when it claims that surface.
 
 ## The `?theme=` review override
 
-Three theme candidates (`ascii`, `minimal`, `serif`) are built as complete
+Four themes (`mono`, `ascii`, `minimal`, `serif`) are built as complete
 `data-theme` token layers. Exactly one ships as the default, set via
 `DEFAULT_THEME` in `src/lib/site.ts` and rendered statically into
 `<html data-theme="...">` -- the page is fully themed even with JavaScript
 disabled.
+
+`mono` is the shipped default: a near-white canvas, a monochrome gray
+scale, a system/Helvetica sans stack for all text, a narrow measure,
+hairline separators, and no cards. The other three remain in the build as
+`?theme=` review options only.
+
+One piece of the page reads `DEFAULT_THEME` directly rather than through a
+token: the landing hero renders the ASCII banner when `ascii` is the
+shipped theme and a lowercase `ccgm` wordmark otherwise. Because
+`<html data-theme>` is static, that branch is decided at build time -- a
+`?theme=` override repaints the tokens but never swaps the hero.
 
 **No user-facing theme switcher ships.** The `?theme=` query parameter
 (implemented in E3's `ThemeInit.astro`) is a review/dev mechanism only: it
@@ -197,7 +208,7 @@ invisible. It is documented here, not in any shipped UI.
 ## Frozen semantic token names
 
 `src/styles/global.css` declares these token slots on `:root`. Every theme
-in `src/styles/themes/*.css` (E3) must set exactly these names -- no renames
+in `src/styles/themes/*.css` must set exactly these names -- no renames
 or removals; additive extension is permitted only alongside a matching
 update to the plan and this list.
 
@@ -212,7 +223,7 @@ update to the plan and this list.
 ```
 
 The last five (`--space-unit`, `--density`, `--layout-max`, `--chrome-style`,
-`--rule-style`) are layout-bearing: they exist so the three themes can differ
+`--rule-style`) are layout-bearing: they exist so the themes can differ
 structurally, not just in colour and type.
 
 ## Never `wrangler pages deploy`

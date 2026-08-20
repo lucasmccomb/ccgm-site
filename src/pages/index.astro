@@ -7,15 +7,29 @@
  * correctly whether the build ran against E1's fixture stub (3 modules) or
  * the real ccgm repo (78+ modules, once E2 lands).
  *
+ * The hero's headline art is chosen at BUILD time from DEFAULT_THEME
+ * (#21), not at runtime: `<html data-theme>` is rendered statically, so
+ * the ASCII banner only belongs on the page when ascii is the theme that
+ * actually ships. Under any other default the hero renders a quiet
+ * lowercase wordmark instead. A `?theme=` review override changes the
+ * token layer, never this branch.
+ *
  * AsciiArt is used without an explicit `art` prop (E3): it self-loads the
  * build-time-generated banner (scripts/ascii-banner.ts ->
  * src/generated/banner.txt) as its default content.
+ *
+ * The hero command <pre> carries tabindex="0" for the same reason every
+ * other command block on the site does: axe's scrollable-region-focusable
+ * rule fires once it overflows horizontally, which it does in the mono
+ * theme's 40rem column -- see install.astro, agents.astro,
+ * ModuleFileSection.astro.
  */
 import { getCollection } from 'astro:content';
 import Base from '../layouts/Base.astro';
 import AsciiArt from '../components/AsciiArt.astro';
 import CopyButton from '../components/CopyButton.astro';
 import { loadModulesIndex } from '../lib/generated.ts';
+import { DEFAULT_THEME } from '../lib/site.ts';
 import {
   HERO_TAGLINE,
   INSTALL_COMMAND,
@@ -43,10 +57,18 @@ const [exampleModule] = [...modules].sort((a, b) => a.data.name.localeCompare(b.
 >
   <section class="hero">
     <h1 class="sr-only">CCGM -- Claude Code God Mode</h1>
-    <AsciiArt label="CCGM -- Claude Code God Mode" />
+    {
+      DEFAULT_THEME === 'ascii' ? (
+        <AsciiArt label="CCGM -- Claude Code God Mode" />
+      ) : (
+        <p class="hero__wordmark" data-wordmark aria-hidden="true">
+          ccgm
+        </p>
+      )
+    }
     <p class="hero__tagline">{HERO_TAGLINE}</p>
 
-    <pre id="install-command" class="hero__command">{INSTALL_COMMAND}</pre>
+    <pre id="install-command" tabindex="0" class="hero__command">{INSTALL_COMMAND}</pre>
     <CopyButton targetId="install-command" label="the install command" />
 
     <nav class="hero__links" aria-label="Site sections">
@@ -101,6 +123,21 @@ const [exampleModule] = [...modules].sort((a, b) => a.data.name.localeCompare(b.
     gap: var(--space-unit);
   }
 
+  /*
+   * The wordmark carries the same job the ASCII banner does under the
+   * ascii default -- it is the page's visual headline, with the real
+   * heading text living in the sr-only <h1> above it. Decorative, so it
+   * is aria-hidden and never read out twice.
+   */
+  .hero__wordmark {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 500;
+    line-height: 1.1;
+    letter-spacing: var(--tracking-display);
+  }
+
   .hero__tagline {
     font-size: 1.125rem;
     color: var(--color-fg);
@@ -130,29 +167,34 @@ const [exampleModule] = [...modules].sort((a, b) => a.data.name.localeCompare(b.
     gap: var(--space-unit);
   }
 
+  /*
+   * Hairline rows, not boxes (#21) -- the same treatment ModuleCard.astro
+   * gives a catalog row, applied here in the component so every theme
+   * gets it and no theme-scoped override is needed. Row separators leave
+   * the gap at 0 so the rules themselves set the rhythm.
+   */
   .install-paths {
     display: grid;
-    gap: var(--space-unit);
+    gap: 0;
     list-style: none;
     padding: 0;
     margin: 0;
   }
 
   .install-paths li {
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    padding: var(--space-unit);
+    border-bottom: 1px solid var(--color-border);
+    padding: calc(var(--space-unit) * 0.5) 0;
   }
 
   .example-module__card {
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    padding: var(--space-unit);
-    background: var(--color-surface-1);
+    border-top: 1px solid var(--color-border);
+    padding: calc(var(--space-unit) * 0.5) 0 0 0;
   }
 
   .example-module__name {
-    font-family: var(--font-mono);
-    font-weight: 700;
+    /* A module name is a name, not code -- same reasoning as
+       ModuleCard.astro's row name. */
+    font-family: var(--font-body);
+    font-weight: 500;
   }
 </style>

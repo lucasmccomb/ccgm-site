@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { HERO_TAGLINE, INSTALL_COMMAND, WHAT_IS_HEADING, WHAT_IS_INTRO } from '../src/lib/pagecopy.ts';
+import { DEFAULT_THEME } from '../src/lib/site.ts';
 
 interface IndexMeta {
   moduleCount: number;
@@ -20,12 +21,16 @@ function readModulesIndexMeta(): IndexMeta {
 }
 
 test.describe('landing page', () => {
-  test('hero renders: ASCII banner, tagline, primary install command with a copy button', async ({
+  test('hero renders: headline art for the shipped default, tagline, primary install command with a copy button', async ({
     page,
   }) => {
     await page.goto('/');
 
-    await expect(page.locator('[role="img"]')).toBeVisible();
+    // Which headline art ships is a build-time branch on DEFAULT_THEME
+    // (#21): the ASCII banner under the ascii theme, a lowercase wordmark
+    // under every other default.
+    const headline = DEFAULT_THEME === 'ascii' ? page.locator('[role="img"]') : page.locator('[data-wordmark]');
+    await expect(headline).toBeVisible();
     await expect(page.getByText(HERO_TAGLINE)).toBeVisible();
 
     const installCommand = page.locator('#install-command');

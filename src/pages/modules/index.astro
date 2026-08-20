@@ -66,7 +66,7 @@ const allTags = [...new Set(modules.flatMap((mod) => mod.data.tags))].sort((a, b
       return (
         <section data-category-section data-category={category} data-category-count={mods.length} aria-labelledby={`category-${category}`}>
           <h2 id={`category-${category}`}>{categoryHeading(category, mods.length)}</h2>
-          <div class="module-grid">
+          <div class="module-list">
             {mods.map((mod) => (
               <ModuleCard module={mod.data} />
             ))}
@@ -122,9 +122,13 @@ const allTags = [...new Set(modules.flatMap((mod) => mod.data.tags))].sort((a, b
     margin-bottom: calc(var(--space-unit) * 2);
   }
 
-  .module-grid {
-    display: grid;
-    gap: var(--space-unit);
-    grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  /*
+   * A single-column list, not a card grid (#21). Row separators live on
+   * ModuleCard's own rule so a filtered-out row takes its separator with
+   * it; an empty category renders no rows and therefore no stray rule.
+   */
+  .module-list {
+    display: flex;
+    flex-direction: column;
   }
 </style>

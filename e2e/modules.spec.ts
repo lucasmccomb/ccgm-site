@@ -1,8 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import AxeBuilder from '@axe-core/playwright';
 import type { APIRequestContext, Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
+import { seriousOrCriticalViolations } from './axe.ts';
 import { SITE_URL, THEMES } from '../src/lib/site.ts';
 import { CATEGORY_VALUES, type ModuleRecord, type ModulesIndex } from '../src/lib/schema.ts';
 import { buildModuleTwin, cappedTwinLabel, FULL_TWIN_LABEL } from '../src/lib/module-twin.ts';
@@ -154,10 +154,7 @@ test.describe('module catalog (/modules)', () => {
       test.skip(testInfo.project.name !== 'chromium', 'one authoritative a11y run per theme is enough');
 
       await page.goto(`/modules?theme=${theme}`);
-      const results = await new AxeBuilder({ page }).analyze();
-      const seriousOrCritical = results.violations.filter(
-        (violation) => violation.impact === 'serious' || violation.impact === 'critical',
-      );
+      const seriousOrCritical = await seriousOrCriticalViolations(page);
       expect(seriousOrCritical, JSON.stringify(seriousOrCritical, null, 2)).toEqual([]);
     });
   }
@@ -432,10 +429,7 @@ test.describe('module detail pages: cross-theme rendering', () => {
         await openDetailsFor(page, path);
       }
 
-      const results = await new AxeBuilder({ page }).analyze();
-      const seriousOrCritical = results.violations.filter(
-        (violation) => violation.impact === 'serious' || violation.impact === 'critical',
-      );
+      const seriousOrCritical = await seriousOrCriticalViolations(page);
       expect(seriousOrCritical, JSON.stringify(seriousOrCritical, null, 2)).toEqual([]);
     });
   }

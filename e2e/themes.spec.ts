@@ -1,5 +1,5 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import { seriousOrCriticalViolations } from './axe.ts';
 import { DEFAULT_THEME, THEMES, type Theme } from '../src/lib/site.ts';
 
 /**
@@ -55,12 +55,12 @@ test.describe('theme candidates (?theme= review override, §3.5)', () => {
       probes[theme] = await probeTheme(page);
     }
 
-    // The DISPLAY font is genuinely distinct across all three themes
-    // (JetBrains Mono / Inter Variable / Newsreader Variable) -- checked
-    // as a CSS custom property rather than the rendered `body` font,
-    // because minimal and serif deliberately share Inter for BODY text
-    // per §3.5 ("serif = ... Inter body"); asserting body font-family
-    // pairwise-unique across all three would fail a spec-correct theme.
+    // The DISPLAY font is genuinely distinct across every theme (system
+    // sans / JetBrains Mono / Inter Variable / Newsreader Variable) --
+    // checked as a CSS custom property rather than the rendered `body`
+    // font, because minimal and serif deliberately share Inter for BODY
+    // text per §3.5 ("serif = ... Inter body"); asserting body
+    // font-family pairwise-unique would fail a spec-correct theme.
     const displayFonts = new Set(THEMES.map((t) => probes[t].displayFontFamily));
     expect(displayFonts.size, JSON.stringify(probes, null, 2)).toBe(THEMES.length);
 
@@ -129,7 +129,7 @@ test.describe('theme candidates (?theme= review override, §3.5)', () => {
     // Static default stands: the override script's storage access is
     // guarded, but the statically-rendered data-theme is untouched either
     // way.
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'ascii');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', DEFAULT_THEME);
     expect(pageErrors).toEqual([]);
   });
 
@@ -165,10 +165,7 @@ test.describe('theme candidates (?theme= review override, §3.5)', () => {
       test.skip(testInfo.project.name !== 'chromium', 'one authoritative a11y run per theme is enough');
 
       await page.goto(`/?theme=${theme}`);
-      const results = await new AxeBuilder({ page }).analyze();
-      const seriousOrCritical = results.violations.filter(
-        (violation) => violation.impact === 'serious' || violation.impact === 'critical',
-      );
+      const seriousOrCritical = await seriousOrCriticalViolations(page);
 
       expect(seriousOrCritical, JSON.stringify(seriousOrCritical, null, 2)).toEqual([]);
     });
@@ -190,10 +187,36 @@ test.describe('theme candidates (?theme= review override, §3.5)', () => {
     });
   }
 
-  test('the ASCII banner node has role="img" and a non-empty aria-label', async ({ page }) => {
+  test('the hero renders the headline art DEFAULT_THEME selects, and only that one', async ({ page }) => {
     await page.goto('/');
-    const banner = page.locator('[role="img"]').first();
-    await expect(banner).toHaveAttribute('aria-label', /.+/);
+
+    if (DEFAULT_THEME === 'ascii') {
+      const banner = page.locator('[role="img"]').first();
+      await expect(banner).toHaveAttribute('aria-label', /.+/);
+      await expect(page.locator('[data-wordmark]')).toHaveCount(0);
+    } else {
+      // The lowercase wordmark is decorative -- the hero's real heading
+      // text is the sr-only <h1>, exactly as it is under the ascii banner.
+      const wordmark = page.locator('[data-wordmark]');
+      await expect(wordmark).toBeVisible();
+      await expect(wordmark).toHaveText('ccgm');
+      await expect(wordmark).toHaveAttribute('aria-hidden', 'true');
+      await expect(page.locator('[role="img"]')).toHaveCount(0);
+    }
+  });
+
+  test('the hero branch is decided at build time by DEFAULT_THEME, not by the ?theme= override', async ({
+    page,
+  }) => {
+    // `<html data-theme>` is static, so which hero ships is a property of
+    // the build, not of the review override. Asking for the ascii theme
+    // must repaint the tokens and nothing else.
+    for (const theme of THEMES) {
+      await page.goto(`/?theme=${theme}`);
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+      await expect(page.locator('[data-wordmark]')).toHaveCount(DEFAULT_THEME === 'ascii' ? 0 : 1);
+      await expect(page.locator('[role="img"]')).toHaveCount(DEFAULT_THEME === 'ascii' ? 1 : 0);
+    }
   });
 
   test('no theme-selection control exists in the shipped chrome', async ({ page }) => {

@@ -10,6 +10,7 @@
  */
 import CopyButton from './CopyButton.astro';
 import { MERGE_FRAGMENT_ANNOTATION, MERGE_FRAGMENT_COPY_LABEL, PLACEHOLDER_ANNOTATION } from '../lib/modulepagecopy.ts';
+import { previewOf } from '../lib/site.ts';
 import type { ContentFile } from '../lib/schema.ts';
 
 interface Props {
@@ -20,12 +21,6 @@ interface Props {
 }
 
 const { type, files, inlinedPaths, moduleName } = Astro.props;
-
-const PREVIEW_CHARS = 800;
-
-function previewOf(content: string): string {
-  return content.length <= PREVIEW_CHARS ? content : `${content.slice(0, PREVIEW_CHARS)}…`;
-}
 
 function safeId(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]/g, '-');

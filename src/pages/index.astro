@@ -75,6 +75,7 @@ const [exampleModule] = [...modules].sort((a, b) => a.data.name.localeCompare(b.
       <a href="/install">Install</a>
       <a href="/agents">For agents</a>
       <a href="/modules">Browse modules</a>
+      <a href="/rules">Rules</a>
     </nav>
   </section>
 
@@ -151,9 +152,16 @@ const [exampleModule] = [...modules].sort((a, b) => a.data.name.localeCompare(b.
     font-family: var(--font-mono);
   }
 
+  /*
+   * Wraps because the section list grows. A fourth entry at a 2rem gap no
+   * longer fits the mono theme's 40rem column at a 375px viewport, which
+   * the standing no-horizontal-overflow check (e2e/themes.spec.ts) reds.
+   * Wrapping fixes it once instead of per added link.
+   */
   .hero__links {
     display: flex;
-    gap: calc(var(--space-unit) * 2);
+    flex-wrap: wrap;
+    gap: calc(var(--space-unit) * 0.5) calc(var(--space-unit) * 2);
   }
 
   .stats {

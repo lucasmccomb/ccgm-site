@@ -90,14 +90,20 @@ html[data-theme='mono'] h3 {
 }
 
 /* Secondary text: everything that supports the reading line without being
-   it -- the footer stamp, the hero tagline, catalog summaries and meta,
-   and the category labels. */
+   it -- the footer stamp, the hero tagline, catalog and rules summaries
+   and meta, and the category labels on both listings. The rules rows
+   (#22) are the catalog rows' direct analogue, so they take the same
+   step down; without these selectors the two listings would render the
+   same kind of meta line at two different weights. */
 html[data-theme='mono'] .site-footer,
 html[data-theme='mono'] .hero__tagline,
 html[data-theme='mono'] .module-row__summary,
 html[data-theme='mono'] .module-row__badges,
 html[data-theme='mono'] .module-row__inventory,
-html[data-theme='mono'] section[data-category-section] h2 {
+html[data-theme='mono'] .rule-row__meta,
+html[data-theme='mono'] .rule-meta,
+html[data-theme='mono'] section[data-category-section] h2,
+html[data-theme='mono'] section[data-rule-category-section] h2 {
   color: var(--mono-fg-muted);
 }
 

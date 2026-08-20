@@ -48,6 +48,11 @@ export function defaultDocEntries(siteUrl: string): DocEntry[] {
       url: `${siteUrl}/modules/index.md`,
       description: 'Every CCGM module, grouped by category, with install-cost and file inventory summaries.',
     },
+    {
+      title: 'Rules index',
+      url: `${siteUrl}/rules/index.md`,
+      description: 'Every always-loaded rule file across all modules, grouped by category, each linking its own twin.',
+    },
   ];
 }
 

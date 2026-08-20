@@ -24,9 +24,21 @@ describe('mdTwinUrlFor', () => {
     expect(mdTwinUrlFor('/modules/autoheal')).toBe('/modules/autoheal.md');
   });
 
+  it('maps the rules index to its own index twin, not a module named "index"', () => {
+    expect(mdTwinUrlFor('/rules')).toBe('/rules/index.md');
+    expect(mdTwinUrlFor('/rules/')).toBe('/rules/index.md');
+  });
+
+  it('maps a module-scoped rule page to /rules/{module}/{slug}.md', () => {
+    expect(mdTwinUrlFor('/rules/verification/verification')).toBe('/rules/verification/verification.md');
+    expect(mdTwinUrlFor('/rules/verification/verification/')).toBe('/rules/verification/verification.md');
+    expect(mdTwinUrlFor('/rules/code-quality/completeness')).toBe('/rules/code-quality/completeness.md');
+  });
+
   it('returns null for pages with no twin (404, unknown paths)', () => {
     expect(mdTwinUrlFor('/404')).toBeNull();
     expect(mdTwinUrlFor('/some/bogus/path')).toBeNull();
     expect(mdTwinUrlFor('/modules/foo/bar')).toBeNull();
+    expect(mdTwinUrlFor('/rules/one/two/three')).toBeNull();
   });
 });

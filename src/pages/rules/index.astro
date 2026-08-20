@@ -1,0 +1,151 @@
+---
+/**
+ * Rules index (#22). Every rule file across every module, grouped by the
+ * module's category -- the same five-value CATEGORY_VALUES axis the module
+ * catalog groups by, and always all five sections, so "5 categories" stays
+ * a structural guarantee rather than a property of this week's census.
+ *
+ * Presentation matches the restyled catalog: hairline-separated rows, no
+ * cards, a quiet meta line per row. Matching it under the shipped default
+ * takes two things, not one -- these local styles AND the muted-secondary
+ * selectors in src/styles/themes/mono.css, which is keyed on an explicit
+ * selector list and therefore does not reach a new class on its own.
+ * .rule-row__meta and section[data-rule-category-section] h2 are named
+ * there alongside their .module-row / [data-category-section] analogues.
+ *
+ * Every value on the page is derived from the ingested index at the
+ * pinned SHA -- the rule count in particular is counted here, never
+ * written down.
+ */
+import Base from '../../layouts/Base.astro';
+import { loadModulesIndex } from '../../lib/generated.ts';
+import { collectRules, groupRulesByCategory } from '../../lib/rules.ts';
+import { categoryHeading, tokenCostBadgeText } from '../../lib/modulepagecopy.ts';
+import {
+  RULES_DESCRIPTION,
+  RULES_EMPTY_CATEGORY_TEXT,
+  RULES_HEADING,
+  RULES_INTRO,
+  RULES_TITLE,
+  rulesStatsLine,
+} from '../../lib/rulespagecopy.ts';
+
+const { modules } = loadModulesIndex();
+const rules = collectRules(modules);
+const groups = groupRulesByCategory(rules);
+const moduleCount = new Set(rules.map((rule) => rule.moduleName)).size;
+---
+
+<Base title={RULES_TITLE} description={RULES_DESCRIPTION}>
+  <h1>{RULES_HEADING}</h1>
+  <p class="rules-intro">{RULES_INTRO}</p>
+  <p data-rules-stats>{rulesStatsLine(rules.length, moduleCount, groups.length)}</p>
+
+  {
+    groups.map((group) => (
+      <section
+        data-rule-category-section
+        data-category={group.category}
+        data-category-count={group.rules.length}
+        aria-labelledby={`rules-category-${group.category}`}
+      >
+        <h2 id={`rules-category-${group.category}`}>{categoryHeading(group.category, group.rules.length)}</h2>
+        {group.rules.length === 0 ? (
+          <p>{RULES_EMPTY_CATEGORY_TEXT}</p>
+        ) : (
+          <div class="rule-list">
+            {group.rules.map((rule) => (
+              <article
+                class="rule-row"
+                data-rule-row
+                data-rule-module={rule.moduleName}
+                data-rule-path={rule.path}
+                data-rule-slug={rule.slug}
+              >
+                <h3 class="rule-row__title">
+                  <a href={rule.url}>{rule.title}</a>
+                </h3>
+                <div class="rule-row__meta">
+                  <a href={`/modules/${rule.moduleName}`} class="rule-row__module" data-rule-module-link>
+                    {rule.moduleDisplayName}
+                  </a>
+                  <span class="rule-row__path">{rule.path}</span>
+                  <span data-rule-cost>{tokenCostBadgeText(rule.tokens)}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+    ))
+  }
+</Base>
+
+<style>
+  .rules-intro {
+    max-width: var(--measure);
+  }
+
+  section[data-rule-category-section] {
+    margin-bottom: calc(var(--space-unit) * 2);
+  }
+
+  /*
+   * A single-column list of hairline rows, not a card grid -- the same
+   * shape the catalog's module list takes (#21). The rule sits on the row
+   * itself so a row always carries its own separator.
+   */
+  .rule-list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .rule-row {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--space-unit) * 0.25);
+    padding: calc(var(--space-unit) * 0.75) 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .rule-row__title {
+    margin: 0;
+    /* A rule title is prose, not code -- it takes the theme's body stack
+       (itself monospace under the ascii theme). */
+    font-family: var(--font-body);
+    font-size: 1rem;
+    font-weight: 500;
+  }
+
+  .rule-row__title a:hover,
+  .rule-row__title a:focus-visible {
+    text-decoration: underline;
+  }
+
+  /*
+   * A quiet meta line: module, declared path, always-loaded cost. Column
+   * gap only -- these wrap at narrow widths and the 1.5 line-height
+   * already leads the wrapped lines apart.
+   */
+  .rule-row__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 calc(var(--space-unit) * 0.75);
+    font-size: 0.8125rem;
+  }
+
+  /*
+   * Tailwind's preflight resets links to `color: inherit` with no
+   * decoration, so a link sitting among plain spans needs its own
+   * affordance. An underline, not a colour -- the mono default carries no
+   * colour accent to spend here.
+   */
+  .rule-row__module {
+    text-decoration: underline;
+  }
+
+  .rule-row__path {
+    font-family: var(--font-mono);
+    word-break: break-all;
+  }
+</style>

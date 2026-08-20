@@ -16,21 +16,34 @@
  *
  * The SVG renders at its natural viewBox width inside an `overflow-x`
  * container rather than scaling to 100%: scaling a 560-unit drawing into a
- * 311px column would render 10px labels at under 6px. The container carries
- * `tabindex="0"` for the same reason every command `<pre>` on this site does
- * -- axe's `scrollable-region-focusable` rule fires once it actually
- * scrolls, which it does at 375px.
+ * 311px column would render 10px labels at under 6px. That container
+ * carries `tabindex="0"` AND `aria-labelledby` pointing at the section's
+ * own `<h2>` -- both halves of the pattern
+ * `src/components/ModuleFileSection.astro` uses for its scrolling `<pre>`.
+ * `tabindex` alone satisfies axe's `scrollable-region-focusable`, but it
+ * would land a keyboard user on an unnamed generic; the heading reference
+ * is what names it.
  *
- * A11y: `role="img"` + `aria-labelledby` pointing at the SVG's own `<title>`
- * (the accessible name) and `<desc>` (what the drawing looks like). That
- * makes the subtree presentational, so the `<text>` runs are never read out
- * raw. The real content is the ordered step list in the `<figcaption>`,
- * which is different prose, not a restatement of the description.
+ * A11y: `role="img"` is what makes the subtree presentational, so the
+ * `<text>` runs are never read out raw. `aria-labelledby` points at the
+ * `<title>` ALONE -- that is the accessible name, and it has to identify
+ * rather than narrate. The `<desc>` ("what the drawing looks like") hangs
+ * off `aria-describedby` instead: folding both into `aria-labelledby`
+ * concatenates them into a 230-325 character name announced on arrival.
+ * The real content is the ordered step list below the figure, which is
+ * different prose, not a restatement of the description.
+ *
+ * Font sizes are emitted as presentation attributes from the same
+ * constants `tests/unit/diagrams.test.ts` measures against, so the
+ * fits-in-its-box invariant cannot drift from what actually renders. They
+ * are attributes, not an inline `<style>`, so the dist invariant holds.
  */
 import {
   BASELINE_OFFSET,
   DIAGRAMS_TRACEABILITY_LABEL,
+  LABEL_FONT_SIZE,
   LINE_HEIGHT,
+  META_FONT_SIZE,
   type DiagramNode,
   type DiagramSpec,
   type ResolvedRef,
@@ -77,85 +90,84 @@ const descId = `${spec.id}-desc`;
   <h2 id={`${spec.id}-heading`}>{spec.heading}</h2>
   <p class="diagram__summary">{spec.summary}</p>
 
-  <figure class="diagram__figure">
-    <div class="diagram__scroll" tabindex="0">
-      <svg
-        class="diagram__svg"
-        role="img"
-        aria-labelledby={`${titleId} ${descId}`}
-        viewBox={`0 0 ${spec.width} ${spec.height}`}
-        width={spec.width}
-        height={spec.height}
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <title id={titleId}>{spec.title}</title>
-        <desc id={descId}>{spec.desc}</desc>
-        <defs>
-          <marker
-            id={arrowId}
-            viewBox="0 0 8 8"
-            refX="7"
-            refY="4"
-            markerWidth="6"
-            markerHeight="6"
-            orient="auto-start-reverse"
-          >
-            <path class="diagram__arrowhead" d="M 0 1 L 7 4 L 0 7 z" />
-          </marker>
-        </defs>
+  <div class="diagram__scroll" tabindex="0" aria-labelledby={`${spec.id}-heading`}>
+    <svg
+      class="diagram__svg"
+      role="img"
+      aria-labelledby={titleId}
+      aria-describedby={descId}
+      viewBox={`0 0 ${spec.width} ${spec.height}`}
+      width={spec.width}
+      height={spec.height}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <title id={titleId}>{spec.title}</title>
+      <desc id={descId}>{spec.desc}</desc>
+      <defs>
+        <marker
+          id={arrowId}
+          viewBox="0 0 8 8"
+          refX="7"
+          refY="4"
+          markerWidth="6"
+          markerHeight="6"
+          orient="auto-start-reverse"
+        >
+          <path class="diagram__arrowhead" d="M 0 1 L 7 4 L 0 7 z" />
+        </marker>
+      </defs>
 
-        {
-          spec.nodes.map((node) => (
-            <rect class={nodeClass(node)} x={node.x} y={node.y} width={node.w} height={node.h} rx="2" />
-          ))
-        }
+      {
+        spec.nodes.map((node) => (
+          <rect class={nodeClass(node)} x={node.x} y={node.y} width={node.w} height={node.h} rx="2" />
+        ))
+      }
 
-        {
-          spec.edges.map((edge) => (
-            <polyline
-              class={`diagram__edge${edge.dashed ? ' diagram__edge--dashed' : ''}`}
-              points={edge.points.map(([x, y]) => `${x},${y}`).join(' ')}
-              marker-end={`url(#${arrowId})`}
-            />
-          ))
-        }
+      {
+        spec.edges.map((edge) => (
+          <polyline
+            class={`diagram__edge${edge.dashed ? ' diagram__edge--dashed' : ''}`}
+            points={edge.points.map(([x, y]) => `${x},${y}`).join(' ')}
+            marker-end={`url(#${arrowId})`}
+          />
+        ))
+      }
 
-        {
-          spec.nodes.flatMap((node) =>
-            textLines(node).map((line) => (
-              <text
-                class={line.meta ? 'diagram__meta' : 'diagram__label'}
-                x={node.x + node.w / 2}
-                y={line.y}
-                text-anchor="middle"
-              >
-                {line.text}
-              </text>
-            )),
-          )
-        }
-
-        {
-          (spec.captions ?? []).map((caption) => (
+      {
+        spec.nodes.flatMap((node) =>
+          textLines(node).map((line) => (
             <text
-              class="diagram__meta"
-              x={caption.x}
-              y={caption.y}
-              text-anchor={caption.anchor ?? 'start'}
+              class={line.meta ? 'diagram__meta' : 'diagram__label'}
+              x={node.x + node.w / 2}
+              y={line.y}
+              font-size={line.meta ? META_FONT_SIZE : LABEL_FONT_SIZE}
+              text-anchor="middle"
             >
-              {caption.text}
+              {line.text}
             </text>
-          ))
-        }
-      </svg>
-    </div>
+          )),
+        )
+      }
 
-    <figcaption class="diagram__fallback">
-      <ol class="diagram__steps">
-        {spec.steps.map((step) => <li>{step}</li>)}
-      </ol>
-    </figcaption>
-  </figure>
+      {
+        (spec.captions ?? []).map((caption) => (
+          <text
+            class="diagram__meta"
+            x={caption.x}
+            y={caption.y}
+            font-size={META_FONT_SIZE}
+            text-anchor={caption.anchor ?? 'start'}
+          >
+            {caption.text}
+          </text>
+        ))
+      }
+    </svg>
+  </div>
+
+  <ol class="diagram__steps">
+    {spec.steps.map((step) => <li>{step}</li>)}
+  </ol>
 
   <p class="diagram__legend-label" id={`${spec.id}-refs`}>{DIAGRAMS_TRACEABILITY_LABEL}</p>
   <ul class="diagram__legend" aria-labelledby={`${spec.id}-refs`} data-diagram-legend={spec.id}>
@@ -196,10 +208,6 @@ const descId = `${spec.id}-desc`;
     max-width: var(--measure);
   }
 
-  .diagram__figure {
-    margin: var(--space-unit) 0;
-  }
-
   /*
    * The SVG keeps its natural width so 10px labels stay 10px; the container
    * is what yields at narrow viewports. `min-width: 0` + `max-width: 100%`
@@ -212,6 +220,7 @@ const descId = `${spec.id}-desc`;
     min-width: 0;
     border: 1px solid var(--color-border);
     padding: var(--space-unit);
+    margin: var(--space-unit) 0;
     box-sizing: border-box;
   }
 
@@ -243,10 +252,17 @@ const descId = `${spec.id}-desc`;
     stroke-dasharray: 3 3;
   }
 
+  /*
+   * 0.5, not the 0.45 this started at: the connectors are the one part of
+   * the drawing that carries direction, and at 0.45 they measured 2.88:1
+   * under `mono` and 2.78:1 under `serif` -- just under WCAG 1.4.11's 3:1
+   * for graphical objects. 0.5 clears it in all four themes while staying
+   * well inside the quiet register the boxes set at 0.3.
+   */
   .diagram__edge {
     fill: none;
     stroke: var(--color-fg);
-    stroke-opacity: 0.45;
+    stroke-opacity: 0.5;
     stroke-width: 1;
   }
 
@@ -256,29 +272,26 @@ const descId = `${spec.id}-desc`;
 
   .diagram__arrowhead {
     fill: var(--color-fg);
-    fill-opacity: 0.45;
+    fill-opacity: 0.5;
   }
 
+  /* Font SIZE is a presentation attribute emitted from LABEL_FONT_SIZE /
+     META_FONT_SIZE (see the header note); only face and fill live here, so
+     the size the fit test measures and the size that renders cannot drift. */
   .diagram__label {
     fill: var(--color-fg);
     font-family: var(--font-body);
-    font-size: 12px;
   }
 
   .diagram__meta {
     fill: var(--color-fg);
     fill-opacity: 0.66;
     font-family: var(--font-mono);
-    font-size: 10px;
-  }
-
-  .diagram__fallback {
-    margin: var(--space-unit) 0 0 0;
   }
 
   .diagram__steps {
     max-width: var(--measure);
-    margin: 0;
+    margin: var(--space-unit) 0 0 0;
     padding-left: calc(var(--space-unit) * 1.5);
     display: flex;
     flex-direction: column;

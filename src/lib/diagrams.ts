@@ -38,7 +38,14 @@ export const DIAGRAMS_TRACEABILITY_LABEL = 'Drawn from';
 export const DIAGRAMS_TRACEABILITY_NOTE =
   'Links resolve to this site where the file is part of an ingested module, and to a SHA-pinned GitHub blob otherwise.';
 
-/** Type-scale constants shared by the renderer and the fits-in-its-box test. */
+/**
+ * Type scale. `Diagram.astro` emits LABEL_FONT_SIZE / META_FONT_SIZE as
+ * `font-size` presentation attributes and `tests/unit/diagrams.test.ts`
+ * measures against the same two constants, so the size the fit invariant
+ * checks is the size that renders. LINE_HEIGHT and BASELINE_OFFSET are the
+ * renderer's own text-block layout; the test reads LINE_HEIGHT too, for the
+ * vertical-fit assertion.
+ */
 export const LABEL_FONT_SIZE = 12;
 export const META_FONT_SIZE = 10;
 export const LINE_HEIGHT = 12;
@@ -51,12 +58,35 @@ const MONO_ADVANCE = 0.6;
 const SANS_ADVANCE = 0.56;
 
 /**
+ * The widest per-character advance any theme puts a diagram label in.
+ * `ascii` sets `--font-body` to JetBrains Mono (src/styles/themes/ascii.css),
+ * so a "body face" label there renders at the mono advance, not the sans one
+ * -- roughly 7% wider. Measuring labels at this value keeps the fit check
+ * honest for every theme rather than only the three with a proportional face.
+ */
+export const WIDEST_ADVANCE = MONO_ADVANCE;
+
+/**
  * Deterministic width estimate for a run of text, in viewBox units.
- * Coarse on purpose -- it is not a font metric, it is the bound the
- * "no label overflows its own box" invariant is asserted against.
+ * Coarse on purpose. An average advance is not a true upper bound for a
+ * proportional face, so treat this as a deliberately generous estimate that
+ * the "no label overflows its own box" invariant is asserted against -- not
+ * as a guarantee about glyph metrics.
  */
 export function estimateTextWidth(text: string, fontSize: number, mono: boolean): number {
   return text.length * fontSize * (mono ? MONO_ADVANCE : SANS_ADVANCE);
+}
+
+/** Gap left between a node's edge and an incoming arrowhead's tip. */
+export const ARROW_GAP = 2;
+
+/**
+ * A straight vertical connector from the bottom of `from` to the top of
+ * `to`, at x. Most edges in these diagrams are exactly this, and hand-typing
+ * the pair means re-deriving both endpoints whenever a node moves.
+ */
+export function vEdge(x: number, from: DiagramNode, to: DiagramNode): DiagramEdge {
+  return { points: [[x, from.y + from.h], [x, to.y - ARROW_GAP]] };
 }
 
 /**
@@ -123,6 +153,60 @@ export interface DiagramSpec {
 // 1. Install flow -- start.sh to ~/.claude
 // ---------------------------------------------------------------------------
 
+/**
+ * Nodes are named consts, not anonymous array entries, so `vEdge()` can
+ * derive each connector from the boxes it joins. Moving a stage then means
+ * editing one `y` instead of re-deriving both endpoints of every edge that
+ * touched it.
+ */
+const installNodes = {
+  start: { x: 110, y: 12, w: 340, h: 40, label: './start.sh', sub: ['--preset · --link · --scope · --add'] },
+  resolve: {
+    x: 110,
+    y: 72,
+    w: 340,
+    h: 40,
+    label: 'Resolve modules and dependencies',
+    sub: ['presets/*.json · lib/modules.sh'],
+  },
+  backup: {
+    x: 110,
+    y: 132,
+    w: 340,
+    h: 40,
+    label: 'Back up what is already there',
+    sub: ['lib/backup.sh → ~/.claude/backups/'],
+  },
+  prune: { x: 110, y: 192, w: 340, h: 40, label: 'Prune stale symlinks', sub: ['lib/repair.sh'] },
+  plan: {
+    x: 110,
+    y: 252,
+    w: 340,
+    h: 52,
+    label: 'Install plan: copy · link · merge',
+    sub: ['lib/template.sh expands __PLACEHOLDER__', 'lib/merge.sh folds settings.partial.json'],
+  },
+  verify: {
+    x: 110,
+    y: 324,
+    w: 340,
+    h: 40,
+    label: 'Write the manifest, then verify',
+    sub: ['.ccgm-manifest.json · placeholder check'],
+  },
+  target: { x: 40, y: 396, w: 480, h: 104, kind: 'group' },
+  targetDirs: { x: 56, y: 426, w: 200, h: 30, kind: 'soft', sub: ['rules/ commands/ hooks/'] },
+  targetLibs: { x: 304, y: 426, w: 200, h: 30, kind: 'soft', sub: ['lib/ scripts/ agents/ skills/'] },
+  targetFiles: {
+    x: 56,
+    y: 464,
+    w: 448,
+    h: 30,
+    kind: 'soft',
+    sub: ['settings.json · .ccgm.env · .ccgm-manifest.json'],
+  },
+} satisfies Record<string, DiagramNode>;
+
 const installFlow: DiagramSpec = {
   id: 'install-flow',
   heading: 'Install flow',
@@ -141,60 +225,14 @@ const installFlow: DiagramSpec = {
   ],
   width: 560,
   height: 512,
-  nodes: [
-    { x: 110, y: 12, w: 340, h: 40, label: './start.sh', sub: ['--preset · --link · --scope · --add'] },
-    {
-      x: 110,
-      y: 72,
-      w: 340,
-      h: 40,
-      label: 'Resolve modules and dependencies',
-      sub: ['presets/*.json · lib/modules.sh'],
-    },
-    {
-      x: 110,
-      y: 132,
-      w: 340,
-      h: 40,
-      label: 'Back up what is already there',
-      sub: ['lib/backup.sh → ~/.claude/backups/'],
-    },
-    { x: 110, y: 192, w: 340, h: 40, label: 'Prune stale symlinks', sub: ['lib/repair.sh'] },
-    {
-      x: 110,
-      y: 252,
-      w: 340,
-      h: 52,
-      label: 'Install plan: copy · link · merge',
-      sub: ['lib/template.sh expands __PLACEHOLDER__', 'lib/merge.sh folds settings.partial.json'],
-    },
-    {
-      x: 110,
-      y: 324,
-      w: 340,
-      h: 40,
-      label: 'Write the manifest, then verify',
-      sub: ['.ccgm-manifest.json · placeholder check'],
-    },
-    { x: 40, y: 396, w: 480, h: 104, kind: 'group' },
-    { x: 56, y: 426, w: 200, h: 30, kind: 'soft', sub: ['rules/ commands/ hooks/'] },
-    { x: 304, y: 426, w: 200, h: 30, kind: 'soft', sub: ['lib/ scripts/ agents/ skills/'] },
-    {
-      x: 56,
-      y: 464,
-      w: 448,
-      h: 30,
-      kind: 'soft',
-      sub: ['settings.json · .ccgm.env · .ccgm-manifest.json'],
-    },
-  ],
+  nodes: Object.values(installNodes),
   edges: [
-    { points: [[280, 52], [280, 70]] },
-    { points: [[280, 112], [280, 130]] },
-    { points: [[280, 172], [280, 190]] },
-    { points: [[280, 232], [280, 250]] },
-    { points: [[280, 304], [280, 322]] },
-    { points: [[280, 364], [280, 394]] },
+    vEdge(280, installNodes.start, installNodes.resolve),
+    vEdge(280, installNodes.resolve, installNodes.backup),
+    vEdge(280, installNodes.backup, installNodes.prune),
+    vEdge(280, installNodes.prune, installNodes.plan),
+    vEdge(280, installNodes.plan, installNodes.verify),
+    vEdge(280, installNodes.verify, installNodes.target),
   ],
   captions: [{ x: 52, y: 416, text: '~/.claude/', anchor: 'start' }],
   refs: [
@@ -255,6 +293,10 @@ const moduleAnatomy: DiagramSpec = {
     { x: 308, y: 276, w: 224, h: 28, kind: 'soft', sub: ['settings.json (deep-merged)'] },
   ],
   edges: [
+    // Horizontal row pairings, left column to right. Left rows all end at
+    // x=252 and right rows start at x=308; these keep a 4-unit clearance on
+    // both sides rather than vEdge's one-sided ARROW_GAP, so they stay
+    // literal.
     { points: [[256, 138], [304, 138]] },
     { points: [[256, 176], [304, 176]] },
     { points: [[256, 214], [304, 214]] },
@@ -304,6 +346,53 @@ const moduleAnatomy: DiagramSpec = {
 // 3. Hook gate pipeline -- PreToolUse on a Bash tool call
 // ---------------------------------------------------------------------------
 
+const hookNodes = {
+  call: { x: 170, y: 12, w: 220, h: 34, label: 'Bash tool call' },
+  registration: {
+    x: 110,
+    y: 64,
+    w: 340,
+    h: 58,
+    label: 'hooks.PreToolUse, matcher "Bash"',
+    sub: ['~/.claude/settings.json (built by lib/merge.sh)', 'dispatcher + branch-guard.py (standard)'],
+  },
+  dispatcher: {
+    x: 110,
+    y: 140,
+    w: 340,
+    h: 46,
+    label: 'Dispatcher: one process, not six',
+    sub: ['hooks/pretooluse-bash-dispatch.py'],
+  },
+  manifest: { x: 40, y: 206, w: 480, h: 190, kind: 'group' },
+  precedence: {
+    x: 110,
+    y: 408,
+    w: 340,
+    h: 46,
+    label: 'hard_block > deny > allow > ask',
+    sub: ['hook_dispatcher.DECISION_RANK'],
+  },
+  hardBlock: {
+    x: 50,
+    y: 484,
+    w: 200,
+    h: 46,
+    kind: 'soft',
+    label: 'exit 2 (bypass-proof)',
+    sub: ['hook_utils.hard_block()'],
+  },
+  decision: {
+    x: 310,
+    y: 484,
+    w: 200,
+    h: 46,
+    kind: 'soft',
+    label: 'decision on stdout',
+    sub: ['hook_utils.emit_decision()'],
+  },
+} satisfies Record<string, DiagramNode>;
+
 const hookGate: DiagramSpec = {
   id: 'hook-gate',
   heading: 'Hook gate pipeline',
@@ -322,49 +411,14 @@ const hookGate: DiagramSpec = {
   ],
   width: 560,
   height: 544,
-  nodes: [
-    { x: 170, y: 12, w: 220, h: 34, label: 'Bash tool call' },
-    {
-      x: 110,
-      y: 64,
-      w: 340,
-      h: 58,
-      label: 'hooks.PreToolUse, matcher "Bash"',
-      sub: ['~/.claude/settings.json (built by lib/merge.sh)', 'dispatcher + branch-guard.py (standard)'],
-    },
-    {
-      x: 110,
-      y: 140,
-      w: 340,
-      h: 46,
-      label: 'Dispatcher: one process, not six',
-      sub: ['hooks/pretooluse-bash-dispatch.py'],
-    },
-    { x: 40, y: 206, w: 480, h: 190, kind: 'group' },
-    {
-      x: 110,
-      y: 408,
-      w: 340,
-      h: 46,
-      label: 'hard_block > deny > allow > ask',
-      sub: ['hook_dispatcher.DECISION_RANK'],
-    },
-    { x: 50, y: 484, w: 200, h: 46, kind: 'soft', label: 'exit 2 (bypass-proof)', sub: ['hook_utils.hard_block()'] },
-    {
-      x: 310,
-      y: 484,
-      w: 200,
-      h: 46,
-      kind: 'soft',
-      label: 'decision on stdout',
-      sub: ['hook_utils.emit_decision()'],
-    },
-  ],
+  nodes: Object.values(hookNodes),
   edges: [
-    { points: [[280, 46], [280, 62]] },
-    { points: [[280, 122], [280, 138]] },
-    { points: [[280, 186], [280, 204]] },
-    { points: [[280, 396], [280, 406]] },
+    vEdge(280, hookNodes.call, hookNodes.registration),
+    vEdge(280, hookNodes.registration, hookNodes.dispatcher),
+    vEdge(280, hookNodes.dispatcher, hookNodes.manifest),
+    vEdge(280, hookNodes.manifest, hookNodes.precedence),
+    // The precedence node forks; both branches drop to a shared y then run
+    // out to their own outcome box, so they are polylines rather than vEdges.
     { points: [[280, 454], [280, 468], [150, 468], [150, 482]] },
     { points: [[280, 454], [280, 468], [410, 468], [410, 482]] },
   ],
@@ -394,7 +448,7 @@ const hookGate: DiagramSpec = {
     },
     {
       path: 'modules/hooks/hooks/pretooluse-bash-dispatch.py',
-      role: 'The single PreToolUse:Bash entry point and the declarative manifest it builds.',
+      role: "The hooks module's PreToolUse:Bash entry point and the declarative manifest it builds.",
     },
     {
       path: 'modules/hooks/lib/hook_dispatcher.py',
@@ -423,6 +477,52 @@ const hookGate: DiagramSpec = {
 // 4. Multi-agent worktree flow
 // ---------------------------------------------------------------------------
 
+const worktreeNodes = {
+  delegator: {
+    x: 24,
+    y: 14,
+    w: 240,
+    h: 46,
+    label: 'Delegator splits the work',
+    sub: ['Agent/Workflow isolation: worktree'],
+  },
+  created: { x: 296, y: 14, w: 240, h: 46, label: 'One worktree per unit', sub: ['.claude/worktrees/<name>'] },
+  implement: {
+    x: 296,
+    y: 82,
+    w: 240,
+    h: 46,
+    label: 'Sub-agent implements',
+    sub: ['own index + HEAD, feature branch'],
+  },
+  merged: { x: 296, y: 150, w: 240, h: 46, label: 'PR opened and merged', sub: ['squash merge onto origin/main'] },
+  teardown: {
+    x: 296,
+    y: 218,
+    w: 240,
+    h: 52,
+    label: 'Teardown (mandatory)',
+    sub: ['worktree-sweep.sh --worktree <path>', 'non-force remove, then prune'],
+  },
+  backstop: {
+    x: 24,
+    y: 218,
+    w: 240,
+    h: 52,
+    label: '/worktree-sweep backstop',
+    sub: ['removes only CLEAN worktrees', 'preserves uncommitted / mid-rebase'],
+  },
+  branchRule: {
+    x: 24,
+    y: 300,
+    w: 512,
+    h: 52,
+    kind: 'soft',
+    label: 'Branch deleted only when its work is already upstream',
+    sub: ['ancestor of the default branch, or patch-equivalent after a squash merge'],
+  },
+} satisfies Record<string, DiagramNode>;
+
 const worktreeFlow: DiagramSpec = {
   id: 'worktree-flow',
   heading: 'Multi-agent worktree flow',
@@ -441,52 +541,17 @@ const worktreeFlow: DiagramSpec = {
   ],
   width: 560,
   height: 380,
-  nodes: [
-    {
-      x: 24,
-      y: 14,
-      w: 240,
-      h: 46,
-      label: 'Delegator splits the work',
-      sub: ['Agent/Workflow isolation: worktree'],
-    },
-    { x: 296, y: 14, w: 240, h: 46, label: 'One worktree per unit', sub: ['.claude/worktrees/<name>'] },
-    { x: 296, y: 82, w: 240, h: 46, label: 'Sub-agent implements', sub: ['own index + HEAD, feature branch'] },
-    { x: 296, y: 150, w: 240, h: 46, label: 'PR opened and merged', sub: ['squash merge onto origin/main'] },
-    {
-      x: 296,
-      y: 218,
-      w: 240,
-      h: 52,
-      label: 'Teardown (mandatory)',
-      sub: ['worktree-sweep.sh --worktree <path>', 'non-force remove, then prune'],
-    },
-    {
-      x: 24,
-      y: 218,
-      w: 240,
-      h: 52,
-      label: '/worktree-sweep backstop',
-      sub: ['removes only CLEAN worktrees', 'preserves uncommitted / mid-rebase'],
-    },
-    {
-      x: 24,
-      y: 300,
-      w: 512,
-      h: 52,
-      kind: 'soft',
-      label: 'Branch deleted only when its work is already upstream',
-      sub: ['ancestor of the default branch, or patch-equivalent after a squash merge'],
-    },
-  ],
+  nodes: Object.values(worktreeNodes),
   edges: [
+    // Delegator hands off rightward into the per-unit column.
     { points: [[266, 37], [294, 37]] },
-    { points: [[416, 60], [416, 80]] },
-    { points: [[416, 128], [416, 148]] },
-    { points: [[416, 196], [416, 216]] },
+    vEdge(416, worktreeNodes.created, worktreeNodes.implement),
+    vEdge(416, worktreeNodes.implement, worktreeNodes.merged),
+    vEdge(416, worktreeNodes.merged, worktreeNodes.teardown),
+    // Teardown back to the backstop: right-to-left, so not a vEdge.
     { points: [[294, 244], [266, 244]], dashed: true },
-    { points: [[416, 270], [416, 298]] },
-    { points: [[144, 270], [144, 298]] },
+    vEdge(416, worktreeNodes.teardown, worktreeNodes.branchRule),
+    vEdge(144, worktreeNodes.backstop, worktreeNodes.branchRule),
   ],
   captions: [
     { x: 280, y: 370, text: 'git branch -D is denied; the sweep is the permitted path.', anchor: 'middle' },
@@ -523,6 +588,59 @@ const worktreeFlow: DiagramSpec = {
 // 5. Memory / learnings loop
 // ---------------------------------------------------------------------------
 
+const memoryNodes = {
+  session: { x: 180, y: 12, w: 200, h: 40, label: 'Claude Code session', sub: ['~/.claude/projects/**'] },
+  capture: {
+    x: 30,
+    y: 84,
+    w: 210,
+    h: 66,
+    label: 'Capture',
+    sub: ['/reflect · /consolidate', 'hooks/reflection-trigger.py', 'hooks/precompact-reflection.py'],
+  },
+  mining: {
+    x: 300,
+    y: 84,
+    w: 210,
+    h: 66,
+    label: 'Nightly mining',
+    sub: ['bin/dream-daily.sh', 'lib/transcript_miner.py', 'lib/dream_analyze.py'],
+  },
+  write: {
+    x: 30,
+    y: 172,
+    w: 210,
+    h: 66,
+    label: 'Write an op-event',
+    sub: ['bin/ccgm-learnings-log', 'lib/learnings_store.py', 'add · verify · contradict'],
+  },
+  proposals: {
+    x: 300,
+    y: 172,
+    w: 210,
+    h: 66,
+    label: 'Evidence-tagged proposals',
+    sub: ['~/.claude/dreaming/proposals/', '/dream-apply human gate'],
+  },
+  store: {
+    x: 90,
+    y: 266,
+    w: 380,
+    h: 64,
+    kind: 'soft',
+    label: 'Learnings store (append-only JSONL)',
+    sub: ['~/.claude/learnings/{slug}/agents/{id}.jsonl', 'confidence decay · staleness · dwell_until'],
+  },
+  inject: {
+    x: 90,
+    y: 352,
+    w: 380,
+    h: 64,
+    label: 'SessionStart injection (opt-in)',
+    sub: ['hooks/learnings-inject.py', 'CCGM_LEARNINGS_INJECT · source=startup'],
+  },
+} satisfies Record<string, DiagramNode>;
+
 const memoryLoop: DiagramSpec = {
   id: 'memory-loop',
   heading: 'Memory and learnings loop',
@@ -541,66 +659,19 @@ const memoryLoop: DiagramSpec = {
   ],
   width: 560,
   height: 440,
-  nodes: [
-    { x: 180, y: 12, w: 200, h: 40, label: 'Claude Code session', sub: ['~/.claude/projects/**'] },
-    {
-      x: 30,
-      y: 84,
-      w: 210,
-      h: 66,
-      label: 'Capture',
-      sub: ['/reflect · /consolidate', 'hooks/reflection-trigger.py', 'hooks/precompact-reflection.py'],
-    },
-    {
-      x: 300,
-      y: 84,
-      w: 210,
-      h: 66,
-      label: 'Nightly mining',
-      sub: ['bin/dream-daily.sh', 'lib/transcript_miner.py', 'lib/dream_analyze.py'],
-    },
-    {
-      x: 30,
-      y: 172,
-      w: 210,
-      h: 66,
-      label: 'Write an op-event',
-      sub: ['bin/ccgm-learnings-log', 'lib/learnings_store.py', 'add · verify · contradict'],
-    },
-    {
-      x: 300,
-      y: 172,
-      w: 210,
-      h: 66,
-      label: 'Evidence-tagged proposals',
-      sub: ['~/.claude/dreaming/proposals/', '/dream-apply human gate'],
-    },
-    {
-      x: 90,
-      y: 266,
-      w: 380,
-      h: 64,
-      kind: 'soft',
-      label: 'Learnings store (append-only JSONL)',
-      sub: ['~/.claude/learnings/{slug}/agents/{id}.jsonl', 'confidence decay · staleness · dwell_until'],
-    },
-    {
-      x: 90,
-      y: 352,
-      w: 380,
-      h: 64,
-      label: 'SessionStart injection (opt-in)',
-      sub: ['hooks/learnings-inject.py', 'CCGM_LEARNINGS_INJECT · source=startup'],
-    },
-  ],
+  nodes: Object.values(memoryNodes),
   edges: [
+    // The session forks at a shared y into the two write columns.
     { points: [[280, 52], [280, 66], [135, 66], [135, 82]] },
     { points: [[280, 52], [280, 66], [405, 66], [405, 82]] },
-    { points: [[135, 150], [135, 170]] },
-    { points: [[405, 150], [405, 170]] },
+    vEdge(135, memoryNodes.capture, memoryNodes.write),
+    vEdge(405, memoryNodes.mining, memoryNodes.proposals),
+    // Both columns step in to their own entry point on the store's top edge.
     { points: [[135, 238], [135, 252], [260, 252], [260, 264]] },
     { points: [[405, 238], [405, 252], [300, 252], [300, 264]] },
-    { points: [[280, 330], [280, 350]] },
+    vEdge(280, memoryNodes.store, memoryNodes.inject),
+    // The return rail: out of the injection box, up the right margin, back
+    // into the session.
     { points: [[470, 384], [536, 384], [536, 32], [382, 32]] },
   ],
   captions: [

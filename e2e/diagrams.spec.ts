@@ -24,9 +24,11 @@ test.describe('diagrams page', () => {
       const section = page.locator(`[data-diagram="${spec.id}"]`);
       await expect(section).toBeVisible();
 
-      // role="img" + a non-empty accessible name, asserted through the
-      // accessibility tree rather than by reading the markup back.
-      const image = section.getByRole('img', { name: spec.title });
+      // role="img" + the accessible name, asserted through the accessibility
+      // tree rather than by reading the markup back. `exact: true` matters:
+      // Playwright substring-matches names by default, so without it this
+      // passes even when <desc> is folded into the name alongside <title>.
+      const image = section.getByRole('img', { name: spec.title, exact: true });
       await expect(image).toHaveCount(1);
 
       // The image-free fallback: one <li> per documented step.

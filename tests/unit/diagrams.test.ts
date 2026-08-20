@@ -5,13 +5,16 @@ import {
   DIAGRAMS,
   DIAGRAMS_HEADING,
   LABEL_FONT_SIZE,
+  LINE_HEIGHT,
   META_FONT_SIZE,
   NODE_PADDING_X,
+  WIDEST_ADVANCE,
   estimateTextWidth,
   resolveRef,
   resolveRefs,
   type DiagramSpec,
 } from '../../src/lib/diagrams.ts';
+import { INLINE_BUDGET_BYTES } from '../../src/lib/inline-budget.ts';
 import { defaultDocEntries } from '../../src/lib/llms.ts';
 import { AGENT_NOTICE } from '../../src/lib/markdown.ts';
 import { SITE_URL } from '../../src/lib/site.ts';
@@ -36,8 +39,6 @@ import { SITE_URL } from '../../src/lib/site.ts';
  */
 
 const DIST_DIR = resolve(process.cwd(), 'dist');
-/** Same page-level cap the module pages inline against (src/lib/inline-budget.ts). */
-const PAGE_BUDGET_BYTES = 250 * 1024;
 
 function requireDist(): void {
   if (!existsSync(DIST_DIR)) {
@@ -126,13 +127,20 @@ describe('diagram specs (structural)', () => {
   );
 
   it.each(DIAGRAMS.map((spec) => [spec.id, spec] as [string, DiagramSpec]))(
-    '%s never renders a label or a path wider than the box holding it',
+    '%s never renders a label or a path wider than the box holding it, measured at the widest face any theme uses',
     (_id, spec) => {
       const overflowing: string[] = [];
 
+      // Labels are measured at WIDEST_ADVANCE, not the sans advance: ascii
+      // sets --font-body to JetBrains Mono, so a "body face" label renders
+      // ~7% wider there than under the other three themes. Measuring at the
+      // narrower face would pass a label that clips under ascii.
+      const widestIsMono = WIDEST_ADVANCE === 0.6;
+      expect(widestIsMono, 'WIDEST_ADVANCE no longer matches the mono advance this check passes').toBe(true);
+
       for (const node of spec.nodes) {
         const available = node.w - NODE_PADDING_X;
-        if (node.label && estimateTextWidth(node.label, LABEL_FONT_SIZE, false) > available) {
+        if (node.label && estimateTextWidth(node.label, LABEL_FONT_SIZE, true) > available) {
           overflowing.push(`label "${node.label}" in a ${node.w}-unit box`);
         }
         for (const sub of node.sub ?? []) {
@@ -143,6 +151,26 @@ describe('diagram specs (structural)', () => {
       }
 
       expect(overflowing, `${spec.id}: text overflows its own node`).toEqual([]);
+    },
+  );
+
+  it.each(DIAGRAMS.map((spec) => [spec.id, spec] as [string, DiagramSpec]))(
+    "%s never stacks more text lines than its node's own height can hold",
+    (_id, spec) => {
+      // Width is not the only way to outgrow a box, and adding a `sub` line
+      // is a likelier edit than lengthening a label. Diagram.astro lays the
+      // block out at exactly LINE_HEIGHT per line, so this is the same
+      // arithmetic the renderer does.
+      const overflowing: string[] = [];
+
+      for (const node of spec.nodes) {
+        const lines = (node.label ? 1 : 0) + (node.sub?.length ?? 0);
+        if (lines * LINE_HEIGHT > node.h) {
+          overflowing.push(`${lines} line(s) in a ${node.h}-unit box (${node.label ?? node.sub?.[0] ?? 'unlabelled'})`);
+        }
+      }
+
+      expect(overflowing, `${spec.id}: text block taller than its own node`).toEqual([]);
     },
   );
 
@@ -215,27 +243,68 @@ describe('built diagrams page (dist-reading, never skipped when dist/ is missing
     }
   });
 
-  it('gives every SVG a non-empty accessible name via aria-labelledby -> <title>', () => {
+  it('names every SVG from its <title> ALONE, and describes it separately from its <desc>', () => {
     const html = readDiagramsHtml();
     const offenders: string[] = [];
 
     for (const tag of svgOpenTags(html)) {
       const labelledBy = attr(tag, 'aria-labelledby');
+      const describedBy = attr(tag, 'aria-describedby');
+
       if (!labelledBy) {
         offenders.push(`no aria-labelledby: ${tag}`);
         continue;
       }
-      const [nameId] = labelledBy.trim().split(/\s+/);
-      const titleMatch = new RegExp(`<title[^>]*\\bid="${nameId}"[^>]*>([\\s\\S]*?)</title>`).exec(html);
+      // Exactly one id: folding <desc> in here would concatenate both into
+      // the accessible NAME, which is what this assertion exists to stop.
+      const ids = labelledBy.trim().split(/\s+/);
+      if (ids.length !== 1) {
+        offenders.push(`aria-labelledby names ${ids.length} elements; the name must be the <title> alone`);
+        continue;
+      }
+      const titleMatch = new RegExp(`<title[^>]*\\bid="${ids[0]}"[^>]*>([\\s\\S]*?)</title>`).exec(html);
       if (!titleMatch || titleMatch[1].trim().length === 0) {
         offenders.push(`aria-labelledby="${labelledBy}" resolves to no non-empty <title>`);
       }
-      for (const id of labelledBy.trim().split(/\s+/)) {
+
+      if (!describedBy) {
+        offenders.push(`no aria-describedby: ${tag}`);
+        continue;
+      }
+      const descMatch = new RegExp(`<desc[^>]*\\bid="${describedBy}"[^>]*>([\\s\\S]*?)</desc>`).exec(html);
+      if (!descMatch || descMatch[1].trim().length === 0) {
+        offenders.push(`aria-describedby="${describedBy}" resolves to no non-empty <desc>`);
+      }
+
+      for (const id of [...ids, describedBy]) {
         expect(html.split(`id="${id}"`).length - 1, `id "${id}" is not unique in the page`).toBe(1);
       }
     }
 
     expect(offenders).toEqual([]);
+  });
+
+  it('names the focusable scroll container from the section heading it belongs to', () => {
+    const html = readDiagramsHtml();
+    const offenders: string[] = [];
+
+    for (const spec of DIAGRAMS) {
+      // tabindex alone satisfies axe; the heading reference is what stops a
+      // keyboard user landing on an unnamed generic (ModuleFileSection.astro
+      // pairs the same two attributes on its scrolling <pre>).
+      const pattern = new RegExp(
+        `<div[^>]*\\bclass="[^"]*diagram__scroll[^"]*"[^>]*\\btabindex="0"[^>]*\\baria-labelledby="${spec.id}-heading"`,
+      );
+      if (!pattern.test(html)) offenders.push(spec.id);
+    }
+
+    expect(offenders, 'scroll containers missing tabindex + aria-labelledby').toEqual([]);
+  });
+
+  it('emits the type-scale constants as font-size attributes, so the fit invariant measures what renders', () => {
+    const html = readDiagramsHtml();
+    expect(html).toContain(`font-size="${LABEL_FONT_SIZE}"`);
+    expect(html).toContain(`font-size="${META_FONT_SIZE}"`);
   });
 
   it('carries an image-free fallback: every diagram heading, summary, and step list is real text', () => {
@@ -252,21 +321,16 @@ describe('built diagrams page (dist-reading, never skipped when dist/ is missing
     }
   });
 
-  it('stays inside the 250 KB page-level inline budget', () => {
+  // The zero-inline-<style> and single-inline-<script> invariants are NOT
+  // re-asserted here: tests/unit/repo-invariants.test.ts already hard-asserts
+  // both across all of dist/**/*.html, and more strictly (it pins ThemeInit's
+  // exact hash against dist/_headers). A local copy could not fail without
+  // the repo-wide one failing first.
+
+  it('stays inside the page-level inline budget the module pages fill against', () => {
     const html = readDiagramsHtml();
     const bytes = Buffer.byteLength(html, 'utf-8');
-    expect(bytes, `/diagrams is ${bytes} bytes`).toBeLessThan(PAGE_BUDGET_BYTES);
-  });
-
-  it('emits no inline <style> and no inline <script> of its own', () => {
-    const html = readDiagramsHtml();
-    expect(/<style[\s>]/i.test(html)).toBe(false);
-    // ThemeInit's `?theme=` override is the site's one inline script; the
-    // diagrams page must not add a second distinct body.
-    const inlineScripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)]
-      .map((match) => match[1])
-      .filter((body) => body.trim().length > 0);
-    expect(new Set(inlineScripts).size).toBeLessThanOrEqual(1);
+    expect(bytes, `/diagrams is ${bytes} bytes`).toBeLessThan(INLINE_BUDGET_BYTES);
   });
 
   it('serves a .md twin carrying the shared preamble, the schemaVersion, and every diagram', () => {

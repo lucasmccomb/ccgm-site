@@ -167,29 +167,34 @@ const [exampleModule] = [...modules].sort((a, b) => a.data.name.localeCompare(b.
     gap: var(--space-unit);
   }
 
+  /*
+   * Hairline rows, not boxes (#21) -- the same treatment ModuleCard.astro
+   * gives a catalog row, applied here in the component so every theme
+   * gets it and no theme-scoped override is needed. Row separators leave
+   * the gap at 0 so the rules themselves set the rhythm.
+   */
   .install-paths {
     display: grid;
-    gap: var(--space-unit);
+    gap: 0;
     list-style: none;
     padding: 0;
     margin: 0;
   }
 
   .install-paths li {
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    padding: var(--space-unit);
+    border-bottom: 1px solid var(--color-border);
+    padding: calc(var(--space-unit) * 0.5) 0;
   }
 
   .example-module__card {
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    padding: var(--space-unit);
-    background: var(--color-surface-1);
+    border-top: 1px solid var(--color-border);
+    padding: calc(var(--space-unit) * 0.5) 0 0 0;
   }
 
   .example-module__name {
-    font-family: var(--font-mono);
-    font-weight: 700;
+    /* A module name is a name, not code -- same reasoning as
+       ModuleCard.astro's row name. */
+    font-family: var(--font-body);
+    font-weight: 500;
   }
 </style>

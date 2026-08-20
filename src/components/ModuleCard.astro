@@ -32,34 +32,34 @@ const inventoryEntries = Object.entries(mod.inventory)
 ---
 
 <article
-  class="module-card"
+  class="module-row"
   data-module-card
   data-module-name={mod.name}
   data-category={mod.category}
   data-tags={mod.tags.join(',')}
 >
-  <h3 class="module-card__name">
+  <h3 class="module-row__name">
     <a href={`/modules/${mod.name}`}>{mod.displayName}</a>
   </h3>
 
-  <p class="module-card__summary">{mod.summary}</p>
+  <p class="module-row__summary">{mod.summary}</p>
 
-  <div class="module-card__badges">
-    <span class="module-card__badge" data-category-badge>{mod.category}</span>
+  <div class="module-row__badges">
+    <span class="module-row__badge" data-category-badge>{mod.category}</span>
     {mod.status && (
-      <span class="module-card__badge module-card__badge--status" data-status-badge={mod.status}>
+      <span class="module-row__badge module-row__badge--status" data-status-badge={mod.status}>
         {mod.status}
       </span>
     )}
-    <span class="module-card__badge" data-cost-badge>
+    <span class="module-row__badge" data-cost-badge>
       {contextCostBadgeText(mod.contextCostTokens)}
     </span>
-    <span class="module-card__badge" data-last-updated>
+    <span class="module-row__badge" data-last-updated>
       updated {formatLastUpdated(mod.lastUpdated)}
     </span>
   </div>
 
-  <ul class="module-card__inventory" data-inventory aria-label={`File types in ${mod.displayName}`}>
+  <ul class="module-row__inventory" data-inventory aria-label={`File types in ${mod.displayName}`}>
     {
       inventoryEntries.map(([type, count]) => (
         <li title={inventoryItemLabel(type, count)}>
@@ -80,7 +80,7 @@ const inventoryEntries = Object.entries(mod.inventory)
    * `card.hidden = true` takes the separator with it and never leaves an
    * orphaned line behind.
    */
-  .module-card {
+  .module-row {
     display: flex;
     flex-direction: column;
     gap: calc(var(--space-unit) * 0.25);
@@ -88,7 +88,7 @@ const inventoryEntries = Object.entries(mod.inventory)
     border-bottom: 1px solid var(--color-border);
   }
 
-  .module-card__name {
+  .module-row__name {
     margin: 0;
     /* A module name is a name, not code -- it takes the theme's body
        stack (which is itself monospace under the ascii theme). */
@@ -97,39 +97,41 @@ const inventoryEntries = Object.entries(mod.inventory)
     font-weight: 500;
   }
 
-  .module-card__name a {
+  .module-row__name a {
     color: var(--color-fg);
     text-decoration: none;
   }
 
-  .module-card__name a:hover,
-  .module-card__name a:focus-visible {
+  .module-row__name a:hover,
+  .module-row__name a:focus-visible {
     text-decoration: underline;
   }
 
-  .module-card__summary {
+  .module-row__summary {
     margin: 0;
   }
 
   /*
-   * Badges become a quiet meta line: same data, no boxes. The row gap is
-   * zero because these wrap onto their own lines at narrow widths.
+   * Badges become a quiet meta line: same data, no boxes. Only a column
+   * gap -- these wrap onto several lines at narrow widths, and the 1.5
+   * line-height already leads those lines apart, so a row gap on top of
+   * it would just open a hole in the middle of the row.
    */
-  .module-card__badges {
+  .module-row__badges {
     display: flex;
     flex-wrap: wrap;
     gap: 0 calc(var(--space-unit) * 0.75);
   }
 
-  .module-card__badge {
+  .module-row__badge {
     font-size: 0.8125rem;
   }
 
-  .module-card__badge--status {
+  .module-row__badge--status {
     font-weight: 500;
   }
 
-  .module-card__inventory {
+  .module-row__inventory {
     display: flex;
     flex-wrap: wrap;
     gap: 0 calc(var(--space-unit) * 0.75);
@@ -140,7 +142,7 @@ const inventoryEntries = Object.entries(mod.inventory)
     font-size: 0.75rem;
   }
 
-  .module-card__inventory li {
+  .module-row__inventory li {
     display: inline-flex;
     gap: 0.25em;
   }

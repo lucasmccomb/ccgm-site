@@ -1,6 +1,6 @@
-import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
+import { seriousOrCriticalViolations } from './axe.ts';
 import { THEMES } from '../src/lib/site.ts';
 import { mdTwinUrlFor } from '../src/lib/mdtwin.ts';
 
@@ -324,10 +324,7 @@ test.describe('404 page', () => {
       test.skip(testInfo.project.name !== 'chromium', 'one authoritative a11y run per theme is enough');
 
       await page.goto(`/this-page-does-not-exist-at-all?theme=${theme}`);
-      const results = await new AxeBuilder({ page }).analyze();
-      const seriousOrCritical = results.violations.filter(
-        (violation) => violation.impact === 'serious' || violation.impact === 'critical',
-      );
+      const seriousOrCritical = await seriousOrCriticalViolations(page);
       expect(seriousOrCritical, JSON.stringify(seriousOrCritical, null, 2)).toEqual([]);
     });
   }
@@ -398,10 +395,7 @@ test.describe('a11y sweep (E6-owned): /install, /agents, a mixed inline/preview 
       test.skip(testInfo.project.name !== 'chromium', 'one authoritative a11y run per theme is enough');
 
       await page.goto(`/install?theme=${theme}`);
-      const results = await new AxeBuilder({ page }).analyze();
-      const seriousOrCritical = results.violations.filter(
-        (violation) => violation.impact === 'serious' || violation.impact === 'critical',
-      );
+      const seriousOrCritical = await seriousOrCriticalViolations(page);
       expect(seriousOrCritical, JSON.stringify(seriousOrCritical, null, 2)).toEqual([]);
     });
   }
@@ -411,10 +405,7 @@ test.describe('a11y sweep (E6-owned): /install, /agents, a mixed inline/preview 
       test.skip(testInfo.project.name !== 'chromium', 'one authoritative a11y run per theme is enough');
 
       await page.goto(`/agents?theme=${theme}`);
-      const results = await new AxeBuilder({ page }).analyze();
-      const seriousOrCritical = results.violations.filter(
-        (violation) => violation.impact === 'serious' || violation.impact === 'critical',
-      );
+      const seriousOrCritical = await seriousOrCriticalViolations(page);
       expect(seriousOrCritical, JSON.stringify(seriousOrCritical, null, 2)).toEqual([]);
     });
   }
@@ -439,10 +430,7 @@ test.describe('a11y sweep (E6-owned): /install, /agents, a mixed inline/preview 
         });
       }
 
-      const results = await new AxeBuilder({ page }).analyze();
-      const seriousOrCritical = results.violations.filter(
-        (violation) => violation.impact === 'serious' || violation.impact === 'critical',
-      );
+      const seriousOrCritical = await seriousOrCriticalViolations(page);
       expect(seriousOrCritical, JSON.stringify(seriousOrCritical, null, 2)).toEqual([]);
     });
   }

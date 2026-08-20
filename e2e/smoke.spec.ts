@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { DEFAULT_THEME } from '../src/lib/site.ts';
 
@@ -7,6 +9,25 @@ import { DEFAULT_THEME } from '../src/lib/site.ts';
  * the default is declared, and these tests fail the moment the served HTML
  * stops matching it.
  */
+
+/**
+ * global.css's neutral `:root` placeholder value for `--layout-max`, read
+ * out of the stylesheet rather than copied here. No theme layer sets it, so
+ * a page still reporting it is a page where no token block applied at all.
+ *
+ * Reading it keeps the assertion honest: a hardcoded '72rem' would quietly
+ * become always-true the day someone edits that placeholder -- which is the
+ * exact failure the assertion exists to catch.
+ */
+function unthemedPlaceholderLayoutMax(): string {
+  const cssPath = join(process.cwd(), 'src', 'styles', 'global.css');
+  const css = readFileSync(cssPath, 'utf-8');
+  const match = /:root\s*\{[^}]*?--layout-max:\s*([^;]+);/.exec(css);
+  if (!match) {
+    throw new Error(`no :root --layout-max declaration found in ${cssPath}`);
+  }
+  return match[1].trim();
+}
 test.describe('smoke', () => {
   test('served HTML carries the DEFAULT_THEME data-theme before any JavaScript runs', async ({ request }) => {
     const response = await request.get('/');
@@ -32,11 +53,11 @@ test.describe('smoke', () => {
     expect(backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
 
     // And the theme's OWN token block won, not global.css's neutral
-    // `:root` placeholder (which is the only declaration of 72rem).
+    // `:root` placeholder.
     const layoutMax = await page.evaluate(() =>
       getComputedStyle(document.documentElement).getPropertyValue('--layout-max').trim(),
     );
-    expect(layoutMax).not.toBe('72rem');
+    expect(layoutMax).not.toBe(unthemedPlaceholderLayoutMax());
 
     await context.close();
   });

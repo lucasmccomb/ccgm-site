@@ -1,5 +1,5 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import { seriousOrCriticalViolations } from './axe.ts';
 import { DEFAULT_THEME, THEMES, type Theme } from '../src/lib/site.ts';
 
 /**
@@ -165,10 +165,7 @@ test.describe('theme candidates (?theme= review override, §3.5)', () => {
       test.skip(testInfo.project.name !== 'chromium', 'one authoritative a11y run per theme is enough');
 
       await page.goto(`/?theme=${theme}`);
-      const results = await new AxeBuilder({ page }).analyze();
-      const seriousOrCritical = results.violations.filter(
-        (violation) => violation.impact === 'serious' || violation.impact === 'critical',
-      );
+      const seriousOrCritical = await seriousOrCriticalViolations(page);
 
       expect(seriousOrCritical, JSON.stringify(seriousOrCritical, null, 2)).toEqual([]);
     });

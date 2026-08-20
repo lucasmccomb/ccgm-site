@@ -2,10 +2,12 @@
  * mono theme (#21) -- the shipped default. A near-white canvas, a purely
  * monochrome gray scale, a system/Helvetica sans stack for every piece of
  * text (only real code keeps `--font-mono`), a narrow measure, hairline
- * separators, zero radius, and no card chrome anywhere.
+ * separators, and zero radius. Code blocks, form controls, and buttons
+ * keep the fill that makes them legible as such; page content does not.
  *
  * Sets exactly the frozen semantic token slots from global.css -- no new
- * names, no removals.
+ * names, no removals. (The one `--mono-*` property below is theme-private
+ * and namespaced; see its own comment.)
  *
  * Scoped as `html[data-theme='mono']`, not the bare attribute selector --
  * see ascii.css's header comment for why (specificity vs. :root).
@@ -45,6 +47,21 @@ html[data-theme='mono'] {
 }
 
 /*
+ * Theme-private and namespaced on purpose: `--mono-*` is NOT part of the
+ * frozen semantic set global.css declares and the README lists, is never
+ * read outside this file, and so needs no plan or README amendment. It
+ * exists because the frozen set carries exactly one text colour while this
+ * theme needs a second, quieter step -- single-sourced here so the value
+ * and the contrast it rests on cannot drift apart.
+ *
+ * #5f5f5f on #fcfcfc is 6.27:1, clear of WCAG AA's 4.5:1 for normal text
+ * at every size it is used at (0.75rem and up).
+ */
+html[data-theme='mono'] {
+  --mono-fg-muted: #5f5f5f;
+}
+
+/*
  * Everything below is theme-scoped chrome, the same shape ascii.css uses
  * for its box-drawing rules: CSS only, no markup, and inert under any
  * other `data-theme`.
@@ -52,14 +69,9 @@ html[data-theme='mono'] {
  * Each selector carries the `html` type selector so it outranks the
  * component-scoped rule it overrides. Astro compiles a component's
  * `.foo { }` to `.foo[data-astro-cid-...]` (specificity 0,2,0), so a bare
- * `[data-theme='mono'] .foo` (also 0,2,0) would tie and lose or win on
- * source order alone. `html[data-theme='mono'] .foo` is 0,2,1 and wins
+ * `[data-theme='mono'] .foo` (also 0,2,0) would tie and be decided by
+ * bundle order. `html[data-theme='mono'] .foo` is 0,2,1 and wins
  * deterministically.
- *
- * Astro stamps the cid onto EVERY compound in a descendant selector, so
- * its `.install-paths li` becomes `.install-paths[cid] li[cid]` (0,3,1).
- * Overriding one of those needs a third class-level selector; the markup's
- * own `data-` hook supplies it rather than an invented `!important`.
  */
 
 /* A restrained type scale. Tailwind's preflight resets every heading to
@@ -77,20 +89,16 @@ html[data-theme='mono'] h3 {
   font-weight: 500;
 }
 
-/*
- * Secondary text. `--color-fg` is the only text token in the frozen set,
- * so the muted step is written literally here (the same way serif.css
- * sets its 17px body size directly) rather than by adding a token. #5f5f5f
- * on #fcfcfc is ~6.2:1 -- clear of WCAG AA for normal text at any size
- * used below.
- */
+/* Secondary text: everything that supports the reading line without being
+   it -- the footer stamp, the hero tagline, catalog summaries and meta,
+   and the category labels. */
 html[data-theme='mono'] .site-footer,
 html[data-theme='mono'] .hero__tagline,
-html[data-theme='mono'] .module-card__summary,
-html[data-theme='mono'] .module-card__badges,
-html[data-theme='mono'] .module-card__inventory,
+html[data-theme='mono'] .module-row__summary,
+html[data-theme='mono'] .module-row__badges,
+html[data-theme='mono'] .module-row__inventory,
 html[data-theme='mono'] section[data-category-section] h2 {
-  color: #5f5f5f;
+  color: var(--mono-fg-muted);
 }
 
 /*
@@ -114,10 +122,11 @@ html[data-theme='mono'] .site-header__brand {
 }
 
 /*
- * The catalog's tag filter is ~380 chips; boxing each one turns the top of
- * the page into a wall of outlines. Here they are plain text, with the
- * pressed state carried by an underline and full-strength text rather than
- * by colour alone.
+ * The catalog's tag filter is one button per distinct tag across the whole
+ * catalog -- enough of them that boxing each turns the top of the page
+ * into a wall of outlines. Here they are plain text, with the pressed
+ * state carried by an underline and full-strength text rather than by
+ * colour alone.
  */
 html[data-theme='mono'] .tag-filter__chips {
   gap: calc(var(--space-unit) * 0.25) calc(var(--space-unit) * 0.75);
@@ -127,8 +136,16 @@ html[data-theme='mono'] .tag-chip,
 html[data-theme='mono'] .tag-filter__clear {
   border: 0;
   background: transparent;
-  padding: 0;
-  color: #5f5f5f;
+  /*
+   * Vertical padding only: it is invisible on a borderless, transparent
+   * chip, and it is what keeps the button clear of WCAG 2.5.8's 24px
+   * target floor. Stripping the border and padding outright collapses the
+   * chip to its ~19.5px line box, which fails the rule on every chip in
+   * the catalog. e2e's axe sweeps enable `target-size` (off by default in
+   * axe-core) so removing this reds the suite instead of shipping.
+   */
+  padding: calc(var(--space-unit) * 0.25) 0;
+  color: var(--mono-fg-muted);
 }
 
 html[data-theme='mono'] .tag-chip[aria-pressed='true'] {
@@ -139,31 +156,4 @@ html[data-theme='mono'] .tag-chip[aria-pressed='true'] {
 
 html[data-theme='mono'] .tag-filter__clear {
   text-decoration: underline;
-}
-
-/*
- * No cards (#21). The landing page's install-path list and example-module
- * box are the last boxed chrome outside the catalog; hairline rows replace
- * them here without touching the markup other themes still box.
- */
-html[data-theme='mono'] .install-paths[data-install-paths] li {
-  border: 0;
-  border-bottom: 1px solid var(--color-border);
-  border-radius: 0;
-  padding: calc(var(--space-unit) * 0.5) 0;
-}
-
-html[data-theme='mono'] .example-module__card {
-  border: 0;
-  border-top: 1px solid var(--color-border);
-  border-radius: 0;
-  background: transparent;
-  padding: calc(var(--space-unit) * 0.5) 0 0 0;
-}
-
-/* Code-adjacent chrome, not code: a module's display name reads as text
-   here, so it takes the body stack like everything else. */
-html[data-theme='mono'] .example-module__name {
-  font-family: var(--font-body);
-  font-weight: 500;
 }

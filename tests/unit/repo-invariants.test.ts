@@ -230,10 +230,16 @@ describe('E2 structural invariants (ingest pipeline, hard-asserted, never loosen
     const siteUrlOrigin = new URL(SITE_URL).origin;
     const urlPattern = /https?:\/\/[^\s")>\]]+/g;
 
+    // Metadata-only artifacts. The per-item twins (/modules/{name}.md,
+    // /rules/{module}/{slug}.md) are deliberately NOT scanned here: they
+    // inline file bodies, and a rule's own prose legitimately cites
+    // third-party URLs (arxiv, llmstxt.org, vendor docs) that this
+    // assertion would read as offenders.
     const filesToScan = [
       join(DIST_DIR, 'llms.txt'),
       join(DIST_DIR, 'llms-full.txt'),
       join(DIST_DIR, 'modules', 'index.md'),
+      join(DIST_DIR, 'rules', 'index.md'),
     ].filter(existsSync);
     expect(filesToScan.length).toBeGreaterThan(0);
 
@@ -254,15 +260,17 @@ describe('E2 structural invariants (ingest pipeline, hard-asserted, never loosen
 
   it('no relative link or image survives markdown rendering anywhere in dist/', () => {
     requireDist();
-    const modulesDir = join(DIST_DIR, 'modules');
-    const mdFiles = readdirSync(modulesDir).filter((f) => f.endsWith('.md'));
+    // Every .md twin under dist/, not just the module ones: the /rules
+    // twins (#22) inline the same ingested markdown bodies and are held to
+    // the same rule.
+    const mdFiles = walk(DIST_DIR, (name) => name.endsWith('.md'));
     expect(mdFiles.length).toBeGreaterThan(0);
 
     const linkPattern = /\]\(([^)]+)\)/g;
     const offenders: string[] = [];
 
     for (const file of mdFiles) {
-      const rawContent = readFileSync(join(modulesDir, file), 'utf-8');
+      const rawContent = readFileSync(file, 'utf-8');
       // Under-cap module twins (§5 E5, decisions.md) inline full file
       // bodies inside fenced code blocks -- source code (a regex literal
       // like `[^/:]+`, a shell parameter expansion) can coincidentally
@@ -304,11 +312,13 @@ describe('E2 structural invariants (ingest pipeline, hard-asserted, never loosen
       expect(record.schemaVersion).toBe(1);
     }
 
-    const perModuleMd = readdirSync(modulesDir).filter((f) => f.endsWith('.md'));
-    expect(perModuleMd.length).toBeGreaterThan(0);
-    for (const file of perModuleMd) {
-      const content = readFileSync(join(modulesDir, file), 'utf-8');
-      expect(content).toMatch(/^---\nschemaVersion: 1\n/);
+    // Every .md twin under dist/, not just the per-module ones -- the
+    // /rules twins (#22) are machine artifacts on the same contract.
+    const twins = walk(DIST_DIR, (name) => name.endsWith('.md'));
+    expect(twins.length).toBeGreaterThan(0);
+    for (const file of twins) {
+      const content = readFileSync(file, 'utf-8');
+      expect(content, `${file} carries no schemaVersion front matter`).toMatch(/^---\nschemaVersion: 1\n/);
     }
   });
 
@@ -327,10 +337,14 @@ describe('E2 structural invariants (ingest pipeline, hard-asserted, never loosen
     };
     expect(presetsJson.meta.notice).toBe(AGENT_NOTICE);
 
-    const modulesDir = join(DIST_DIR, 'modules');
-    const mdFiles = readdirSync(modulesDir).filter((f) => f.endsWith('.md'));
-    expect(mdFiles.length).toBeGreaterThan(0);
-    expect(readFileSync(join(modulesDir, mdFiles[0]), 'utf-8')).toContain(AGENT_NOTICE);
+    // Every .md twin under dist/, not a sample of one: the notice is the
+    // contract, and a whole new twin family (#22's /rules twins) shipping
+    // without it is exactly what this invariant exists to stop.
+    const twins = walk(DIST_DIR, (name) => name.endsWith('.md'));
+    expect(twins.length).toBeGreaterThan(0);
+    for (const file of twins) {
+      expect(readFileSync(file, 'utf-8'), `${file} carries no agent notice`).toContain(AGENT_NOTICE);
+    }
   });
 
   it('every presets/*.json in the real cloned repo parses as a bare array of module-name strings', () => {

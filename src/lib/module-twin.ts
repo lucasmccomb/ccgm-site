@@ -53,14 +53,28 @@ export function buildModuleMetadataLines(mod: ModuleRecord, siteUrl: string): st
   return lines;
 }
 
-/** A fence at least one backtick longer than the longest backtick run already in the content, so a nested ``` in a file body never breaks the surrounding markdown. */
-function fenceFor(content: string): string {
+/**
+ * A fence at least one backtick longer than the longest backtick run
+ * already in the content, so a nested ``` in a file body never breaks the
+ * surrounding markdown.
+ *
+ * Exported so the /rules twins (#22, src/lib/rules.ts) fence an inlined
+ * rule body exactly the way a module twin fences the same bytes, rather
+ * than re-deriving a second fencing rule that could drift from this one.
+ */
+export function fenceFor(content: string): string {
   const runs = content.match(/`+/g) ?? [];
   const longest = runs.reduce((max, run) => Math.max(max, run.length), 0);
   return '`'.repeat(Math.max(3, longest + 1));
 }
 
-function mergeFragmentTwinNote(file: FileEntry, siteUrl: string): string {
+/**
+ * The annotated-link line a merge fragment gets in place of an inlined
+ * body. Takes only the `rawUrl` it actually reads (a FileEntry still
+ * satisfies that), so the /rules twins can emit the identical sentence for
+ * a rule file that is also a merge fragment -- one wording, one place.
+ */
+export function mergeFragmentTwinNote(file: Pick<FileEntry, 'rawUrl'>, siteUrl: string): string {
   return `merge fragment — merged into ~/.claude/settings.json, never copied over it; fetch raw: ${siteUrl}${file.rawUrl}`;
 }
 

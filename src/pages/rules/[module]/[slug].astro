@@ -1,0 +1,194 @@
+---
+/**
+ * One rule, readable in full (#22).
+ *
+ * The body gets exactly the treatments a module file body gets on
+ * src/pages/modules/[name].astro via ModuleFileSection.astro -- the same
+ * 64 KB per-file inline decision (computeInlineBudget), the same merge and
+ * placeholder annotations, the same byte-exact CopyButton in both its
+ * inlined (targetId) and fetch (sourceUrl) modes, and the same
+ * data-pagefind-ignore scoping so the search index keeps tracking prose
+ * rather than the ingested source corpus.
+ *
+ * The route is module-scoped (/rules/{module}/{slug}) because module names
+ * are unique by construction while rule basenames are only unique by
+ * census -- see ruleSlug() in src/lib/rules.ts.
+ */
+import type { GetStaticPaths } from 'astro';
+import Base from '../../../layouts/Base.astro';
+import CopyButton from '../../../components/CopyButton.astro';
+import { loadModulesIndex } from '../../../lib/generated.ts';
+import { computeInlineBudget } from '../../../lib/inline-budget.ts';
+import { collectRules, type RuleRecord } from '../../../lib/rules.ts';
+import {
+  MERGE_FRAGMENT_ANNOTATION,
+  MERGE_FRAGMENT_COPY_LABEL,
+  PLACEHOLDER_ANNOTATION,
+  SOURCE_LINK_LABEL,
+  tokenCostBadgeText,
+} from '../../../lib/modulepagecopy.ts';
+import {
+  RULES_INDEX_LINK_LABEL,
+  RULE_BODY_HEADING,
+  ruleInstallsToText,
+  ruleModuleLinkText,
+  ruleRawLinkLabel,
+  ruleTooLargeToInlineText,
+} from '../../../lib/rulespagecopy.ts';
+
+export const getStaticPaths: GetStaticPaths = () => {
+  const { modules } = loadModulesIndex();
+  return collectRules(modules).map((rule) => ({
+    params: { module: rule.moduleName, slug: rule.slug },
+  }));
+};
+
+const { module: moduleName, slug } = Astro.params;
+const { modules } = loadModulesIndex();
+const rule: RuleRecord | undefined = collectRules(modules).find(
+  (candidate) => candidate.moduleName === moduleName && candidate.slug === slug,
+);
+if (!rule) {
+  throw new Error(
+    `rules/[module]/[slug].astro: no rule record for "${moduleName}/${slug}" -- getStaticPaths and this lookup have drifted`,
+  );
+}
+
+/**
+ * One file, run through the shared page budget so the 64 KB per-file cap
+ * is enforced by the same code the module pages use rather than by an
+ * assumption about how big rules happen to be this week.
+ */
+const [decision] = computeInlineBudget([
+  {
+    path: rule.path,
+    content: rule.content,
+    type: 'rule',
+    hasSubstitutionPlaceholders: rule.hasSubstitutionPlaceholders,
+    isMergeFragment: rule.isMergeFragment,
+    rawUrl: rule.rawUrl,
+    bytes: rule.bytes,
+  },
+]).items;
+const inlined = decision.inlined;
+
+const PREVIEW_CHARS = 800;
+const preview =
+  rule.content.length <= PREVIEW_CHARS ? rule.content : `${rule.content.slice(0, PREVIEW_CHARS)}…`;
+
+const bodyId = 'rule-body';
+const headingId = 'rule-body-heading';
+---
+
+<Base title={`${rule.title} -- CCGM`} description={`${rule.title}, a rule file from the ${rule.moduleDisplayName} CCGM module.`}>
+  <article>
+    <nav class="rule-breadcrumb" aria-label="Breadcrumb">
+      <a href="/rules">{RULES_INDEX_LINK_LABEL}</a>
+    </nav>
+
+    <h1>{rule.title}</h1>
+
+    <div class="rule-meta">
+      <a href={`/modules/${rule.moduleName}`} class="rule-meta__module" data-rule-module-link>
+        {ruleModuleLinkText(rule.moduleDisplayName)}
+      </a>
+      <span class="rule-meta__path" data-rule-path>{rule.path}</span>
+      <span data-rule-target>{ruleInstallsToText(rule.target)}</span>
+      <span data-rule-cost>{tokenCostBadgeText(rule.tokens)}</span>
+    </div>
+
+    {rule.isMergeFragment && <p data-merge-annotation>{MERGE_FRAGMENT_ANNOTATION}</p>}
+    {rule.hasSubstitutionPlaceholders && <p data-placeholder-annotation>{PLACEHOLDER_ANNOTATION}</p>}
+
+    <section aria-labelledby={headingId} data-rule-body-section data-rule-inlined={inlined ? 'true' : 'false'} data-pagefind-ignore>
+      <h2 id={headingId}>{RULE_BODY_HEADING}</h2>
+
+      {inlined ? (
+        <Fragment>
+          {/* No whitespace between the tags and the expression -- <pre>
+              preserves it literally, which would corrupt the byte-exact
+              copy. tabindex="0" + aria-labelledby: this <pre> scrolls and
+              must be keyboard/AT reachable (WCAG 2.1.1, axe
+              scrollable-region-focusable), same as every other file body
+              on the site. */}
+          <pre id={bodyId} tabindex="0" aria-labelledby={headingId} class="rule-body">{rule.content}</pre>
+          <CopyButton
+            targetId={bodyId}
+            label={`the ${rule.path} rule`}
+            idleLabel={rule.isMergeFragment ? MERGE_FRAGMENT_COPY_LABEL : undefined}
+          />
+        </Fragment>
+      ) : (
+        <Fragment>
+          <p data-rule-truncated-note>{ruleTooLargeToInlineText(rule.bytes)}</p>
+          <pre tabindex="0" aria-labelledby={headingId} class="rule-body rule-body--preview" data-rule-preview>{preview}</pre>
+          <CopyButton
+            sourceUrl={rule.rawUrl}
+            label={`the ${rule.path} rule`}
+            idleLabel={rule.isMergeFragment ? MERGE_FRAGMENT_COPY_LABEL : undefined}
+          />
+        </Fragment>
+      )}
+
+      <p>
+        <a href={rule.rawUrl} data-rule-raw-link>{ruleRawLinkLabel(rule.bytes)}</a>
+      </p>
+    </section>
+
+    <p class="rule-source-link">
+      <a href={rule.sourceUrl} data-rule-source-link>{SOURCE_LINK_LABEL}</a>
+    </p>
+  </article>
+</Base>
+
+<style>
+  /*
+   * The breadcrumb and the source link stay at body size. Shrinking them
+   * drops the link box under WCAG 2.5.8's 24px target floor, which the
+   * suite's axe sweeps enable (see e2e/axe.ts) -- the module detail page
+   * leaves its own source link at body size for the same reason.
+   */
+  .rule-breadcrumb a,
+  .rule-source-link a,
+  .rule-meta__module,
+  [data-rule-raw-link] {
+    text-decoration: underline;
+  }
+
+  /*
+   * The same quiet meta line the /rules rows carry: module, declared path,
+   * install target, always-loaded cost. Column gap only -- these wrap at
+   * narrow widths and the 1.5 line-height leads the wrapped lines apart.
+   */
+  .rule-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 calc(var(--space-unit) * 0.75);
+    font-size: 0.8125rem;
+    margin-bottom: var(--space-unit);
+  }
+
+  .rule-meta__path {
+    font-family: var(--font-mono);
+    word-break: break-all;
+  }
+
+  /* Identical to ModuleFileSection.astro's file body: this IS a module
+     file body, shown on its own page. */
+  .rule-body {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: var(--space-unit);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    overflow-x: auto;
+    white-space: pre;
+    max-height: 40rem;
+    overflow-y: auto;
+  }
+
+  .rule-body--preview {
+    white-space: pre-wrap;
+  }
+</style>

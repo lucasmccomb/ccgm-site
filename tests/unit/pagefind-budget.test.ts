@@ -5,12 +5,13 @@ import { describe, expect, it } from 'vitest';
 /**
  * Pagefind index size budget (§5 E6 acceptance: "Pagefind index size within
  * a stated budget (file bodies excluded)"). Measured against the real
- * build: 1.06 MB against the real ccgm corpus (83 pages, 78 modules) with
- * `data-pagefind-ignore` scoping module file-content sections out of the
- * index -- indexing those bodies would pull in a ~4.6 MB corpus of Python,
- * shell, YAML, and JSON instead. 2 MB leaves headroom for ccgm's ongoing
- * module growth (~6 modules/month) without the budget needing to move on
- * every content PR.
+ * build: 1.09 MB against the real ccgm corpus (146 pages, 78 modules, 62
+ * rules) with `data-pagefind-ignore` scoping file-content sections out of
+ * the index -- on the module detail pages and, for the same reason, on the
+ * /rules pages that show one of those same file bodies. Indexing them
+ * would pull in a ~4.6 MB corpus of Python, shell, YAML, and JSON instead.
+ * 2 MB leaves headroom for ccgm's ongoing module growth (~6 modules/month)
+ * without the budget needing to move on every content PR.
  */
 const DIST_DIR = join(process.cwd(), 'dist');
 const PAGEFIND_DIR = join(DIST_DIR, 'pagefind');

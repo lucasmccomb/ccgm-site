@@ -70,6 +70,29 @@ test.describe('headers (wrangler pages dev, production _headers applied)', () =>
     expect(headers['x-robots-tag']).toContain('noindex');
   });
 
+  test('a two-segment rule twin (discovered via /rules/index.md) is served as text/markdown with X-Robots-Tag: noindex', async ({
+    request,
+  }) => {
+    // The one-segment twin above cannot prove this: /rules/{module}/{slug}.md
+    // is two segments deep, and _headers matches by path pattern -- a rule
+    // whose glob stops at one segment would leave this family unheadered
+    // while every assertion above stayed green.
+    const indexResponse = await request.get('/rules/index.md');
+    expect(indexResponse.ok()).toBeTruthy();
+
+    // Twin bodies carry absolute links (relative refs are rewritten at
+    // build time), so take the path back off the first rule entry rather
+    // than hardcoding a module/slug pair that a ccgm rename would rot.
+    const twinPath = /\(https?:\/\/[^)]*?(\/rules\/[^/)]+\/[^/)]+\.md)\)/.exec(await indexResponse.text())?.[1];
+    expect(twinPath, 'no /rules/{module}/{slug}.md link found in /rules/index.md').toBeTruthy();
+
+    const response = await request.get(twinPath!);
+    expect(response.ok(), `${twinPath} did not respond OK`).toBeTruthy();
+    const headers = response.headers();
+    expect(headers['content-type']).toContain('text/markdown');
+    expect(headers['x-robots-tag']).toContain('noindex');
+  });
+
   test('/modules.json is served as application/json', async ({ request }) => {
     const response = await request.get('/modules.json');
     expect(response.ok()).toBeTruthy();

@@ -221,9 +221,20 @@ export const AGENT_URL_SURFACE: AgentUrlSurfaceRow[] = [
       'Raw content of one declared file -- the granular fetch to prefer over an inlined body. The .txt suffix is part of the contract.',
   },
   {
-    pattern: '/index.md, /install.md, /agents.md',
+    pattern: '/rules/index.md',
     contentType: 'text/markdown; charset=utf-8',
-    purpose: 'Markdown twins of this page and its two siblings.',
+    purpose: 'Markdown twin of the rules index -- every always-loaded rule file across every module.',
+  },
+  {
+    pattern: '/rules/{module}/{slug}.md',
+    contentType: 'text/markdown; charset=utf-8',
+    purpose:
+      'Markdown twin of one rule page, carrying that rule file in full. Rule slugs are scoped by the module that ships them, so this path is two segments deep.',
+  },
+  {
+    pattern: '/index.md, /install.md, /agents.md, /examples.md, /diagrams.md',
+    contentType: 'text/markdown; charset=utf-8',
+    purpose: 'Markdown twins of this page and its four top-level siblings.',
   },
 ];
 

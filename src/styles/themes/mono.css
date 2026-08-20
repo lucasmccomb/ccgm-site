@@ -2,8 +2,11 @@
  * mono theme (#21) -- the shipped default. A near-white canvas, a purely
  * monochrome gray scale, a system/Helvetica sans stack for every piece of
  * text (only real code keeps `--font-mono`), a narrow measure, hairline
- * separators, and zero radius. Code blocks, form controls, and buttons
- * keep the fill that makes them legible as such; page content does not.
+ * separators, and zero radius. Code blocks, form controls, and the copy
+ * control keep the fill that makes them legible as such; page content does
+ * not, and neither do the catalog's tag-filter buttons -- there are enough
+ * of those that boxing each one walls off the top of the page, so they are
+ * stripped to plain text below.
  *
  * Sets exactly the frozen semantic token slots from global.css -- no new
  * names, no removals. (The one `--mono-*` property below is theme-private

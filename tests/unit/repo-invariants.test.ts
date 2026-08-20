@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { AGENT_NOTICE } from '../../src/lib/markdown.ts';
 import { RESERVED_ROUTES, SITE_URL } from '../../src/lib/site.ts';
@@ -128,6 +128,27 @@ describe('repo invariants (structural, hard-asserted, never loosened)', () => {
         expect(existsSync(candidate)).toBe(false);
       }
     }
+  });
+
+  it('e2e/axe.ts is the only file under e2e/ that imports AxeBuilder', () => {
+    // `target-size` (WCAG 2.2 SC 2.5.8) ships disabled in axe-core, so a
+    // spec that constructs its own `new AxeBuilder({ page })` silently drops
+    // the rule -- exactly the gap that let #21's sub-24px mono tag chips
+    // pass CI. e2e/axe.ts enables it in one shared place; this invariant is
+    // what stops a future spec from routing around that file.
+    const e2eDir = join(REPO_ROOT, 'e2e');
+    const tsFiles = walk(e2eDir, (name) => name.endsWith('.ts'));
+    expect(tsFiles.length).toBeGreaterThan(0);
+
+    const offenders = tsFiles.filter(
+      (file) => basename(file) !== 'axe.ts' && /\bAxeBuilder\b/.test(readFileSync(file, 'utf-8')),
+    );
+
+    expect(
+      offenders,
+      'these e2e files reference AxeBuilder directly -- import the shared helpers from e2e/axe.ts ' +
+        'instead, or the target-size rule is silently skipped',
+    ).toEqual([]);
   });
 
   it('every url() referenced in built CSS resolves to a file in dist/ (missing-webfont oracle)', () => {

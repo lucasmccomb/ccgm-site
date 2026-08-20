@@ -1,8 +1,9 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   AGENT_PASTE_BLOCK,
+  AGENT_URL_SURFACE,
   INSTALL_COMMAND,
   INSTALL_COMMAND_NONINTERACTIVE,
   MARKETPLACE_ADD_COMMAND,
@@ -39,6 +40,75 @@ interface PresetRecord {
   description: string | null;
   modules: string[];
 }
+
+describe('AGENT_URL_SURFACE', () => {
+  /**
+   * Every twin this site serves is produced by a `.md.ts` endpoint under
+   * src/pages, so the filesystem -- not a hand-kept list -- is the source of
+   * truth for which twin URLs exist. Turn each endpoint path back into the
+   * URL pattern it answers on: strip the src/pages prefix and the .md.ts
+   * suffix, rewrite Astro's `[param]` as the table's `{param}`, re-append
+   * `.md`.
+   */
+  function twinPatternsFromEndpoints(): string[] {
+    const pagesDir = join(process.cwd(), 'src', 'pages');
+    const found: string[] = [];
+
+    function walkPages(dir: string): void {
+      for (const entry of readdirSync(dir)) {
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) {
+          walkPages(full);
+        } else if (entry.endsWith('.md.ts')) {
+          const route = relative(pagesDir, full).split(sep).join('/').replace(/\.md\.ts$/, '');
+          found.push(`/${route.replace(/\[([^\]]+)\]/g, '{$1}')}.md`);
+        }
+      }
+    }
+
+    walkPages(pagesDir);
+    return found.sort();
+  }
+
+  /** One row may bundle several patterns ("/index.md, /install.md"). */
+  function listedPatterns(): Set<string> {
+    return new Set(AGENT_URL_SURFACE.flatMap((row) => row.pattern.split(',').map((p) => p.trim())));
+  }
+
+  it('lists every Markdown twin the site actually serves -- the table cannot go silently stale', () => {
+    // The failure this exists to catch: #22/#23/#24 each shipped a new twin
+    // family and each deferred the table edit, so /agents documented a URL
+    // surface that had been incomplete for three PRs running. A new .md.ts
+    // endpoint now fails here until the table names it.
+    const listed = listedPatterns();
+    const missing = twinPatternsFromEndpoints().filter((pattern) => !listed.has(pattern));
+
+    expect(
+      missing,
+      'these .md.ts endpoints serve a twin that AGENT_URL_SURFACE does not list -- add a row to ' +
+        'src/lib/pagecopy.ts (and the mirrored table in docs/agents.md)',
+    ).toEqual([]);
+  });
+
+  it('lists no twin pattern that no endpoint serves -- the table never over-promises either', () => {
+    const served = new Set(twinPatternsFromEndpoints());
+    const phantom = [...listedPatterns()].filter((pattern) => pattern.endsWith('.md') && !served.has(pattern));
+
+    expect(
+      phantom,
+      'AGENT_URL_SURFACE advertises these .md twins, but no src/pages/**/*.md.ts endpoint produces them',
+    ).toEqual([]);
+  });
+
+  it('every row carries a pattern, a content type, and a purpose', () => {
+    expect(AGENT_URL_SURFACE.length).toBeGreaterThan(0);
+    for (const row of AGENT_URL_SURFACE) {
+      expect(row.pattern.trim().length, `a row has an empty pattern`).toBeGreaterThan(0);
+      expect(row.contentType.trim().length, `${row.pattern} has no content type`).toBeGreaterThan(0);
+      expect(row.purpose.trim().length, `${row.pattern} has no purpose`).toBeGreaterThan(0);
+    }
+  });
+});
 
 describe('AGENT_PASTE_BLOCK', () => {
   it('is the literal README paste block: starts with the install instruction, has 8 numbered steps, no trailing whitespace', () => {

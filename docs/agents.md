@@ -23,7 +23,9 @@ bare URL, without cloning the ccgm repo or parsing HTML.
 | `/modules/{name}.md` | `text/markdown; charset=utf-8` | Markdown twin of a module detail page. |
 | `/modules/index.md` | `text/markdown; charset=utf-8` | Markdown twin of the module catalog. |
 | `/modules/{name}/files/{path}.txt` | `text/plain; charset=utf-8` | Raw content of one declared file -- the granular fetch to prefer over an inlined body. The `.txt` suffix is part of the contract. |
-| `/index.md`, `/install.md`, `/agents.md` | `text/markdown; charset=utf-8` | Markdown twins of the landing, install, and agents pages. |
+| `/rules/index.md` | `text/markdown; charset=utf-8` | Markdown twin of the rules index -- every always-loaded rule file across every module. |
+| `/rules/{module}/{slug}.md` | `text/markdown; charset=utf-8` | Markdown twin of one rule page, carrying that rule file in full. Rule slugs are scoped by the module that ships them, so this path is two segments deep. |
+| `/index.md`, `/install.md`, `/agents.md`, `/examples.md`, `/diagrams.md` | `text/markdown; charset=utf-8` | Markdown twins of this page and its four top-level siblings. |
 
 ## Markdown twins
 

@@ -45,6 +45,35 @@ export function estimateTokens(text: string): number {
 }
 
 /**
+ * How much of a file body a bounded preview shows when the page's inline
+ * budget left it out (§3.4's fill rule, src/lib/inline-budget.ts decides
+ * which files those are).
+ */
+export const PREVIEW_CHARS = 800;
+
+/**
+ * The bounded preview itself. One definition shared by every surface that
+ * renders a non-inlined file body -- the module detail page's per-file
+ * sections (src/components/ModuleFileSection.astro) and the rule detail
+ * page (src/pages/rules/[module]/[slug].astro) -- so the two previews
+ * cannot drift into different truncations of the same bytes.
+ */
+export function previewOf(content: string, maxChars = PREVIEW_CHARS): string {
+  return content.length <= maxChars ? content : `${content.slice(0, maxChars)}…`;
+}
+
+/**
+ * A GitHub blob URL for one file inside a module, derived from that
+ * module's own `sourceUrl` (a `/tree/` link at the pinned SHA) rather than
+ * from a second hardcoded copy of the repo URL. Shared by every surface
+ * that links a single file on GitHub: the module detail page's postInstall
+ * callout and the rule detail page's source link.
+ */
+export function blobUrlFor(moduleSourceUrl: string, filePath: string): string {
+  return `${moduleSourceUrl.replace('/tree/', '/blob/')}/${filePath}`;
+}
+
+/**
  * Reduce a description to an llms.txt-safe summary line.
  *
  * Rules (all unit-tested over the 78 real ccgm descriptions in E2):

@@ -50,7 +50,7 @@ import {
   postInstallCalloutText,
   remainderNoteText,
 } from '../../lib/modulepagecopy.ts';
-import { SITE_URL } from '../../lib/site.ts';
+import { blobUrlFor, SITE_URL } from '../../lib/site.ts';
 import { FILE_TYPE_BUCKETS } from '../../lib/schema.ts';
 
 export const getStaticPaths: GetStaticPaths = () => {
@@ -86,9 +86,7 @@ const readmeHtml = mod.readmeMd ? renderMarkdownToHtml(mod.readmeMd).replace(/<p
 // per the plan's explicit "CopyButton and GitHub link" pairing. Derived
 // from mod.sourceUrl (a /tree/ link) rather than hardcoding the repo URL a
 // second time in this page.
-const postInstallGithubUrl = mod.postInstallFile
-  ? `${mod.sourceUrl.replace('/tree/', '/blob/')}/${mod.postInstallFile.path}`
-  : '';
+const postInstallGithubUrl = mod.postInstallFile ? blobUrlFor(mod.sourceUrl, mod.postInstallFile.path) : '';
 
 const inlineBudget = computeInlineBudget(mod.contentFiles);
 const inlinedPaths = new Set(inlineBudget.items.filter((item) => item.inlined).map((item) => item.file.path));

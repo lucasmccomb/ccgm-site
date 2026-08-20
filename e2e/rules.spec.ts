@@ -28,13 +28,23 @@ function allRules(): RuleRecord[] {
 
 /**
  * A small, deterministic sample for the per-page checks: the first rule,
- * the last, and the largest. Derived from the data rather than hardcoded
- * module names, so a ccgm census change re-picks the sample instead of
- * reding the suite.
+ * the last, the largest by bytes, and the extremes of title and declared
+ * path length -- the two the 375px sweep would otherwise miss, since a
+ * per-page overflow comes from a long unbroken string, not from file size.
+ * Derived from the data rather than hardcoded module names, so a ccgm
+ * census change re-picks the sample instead of reding the suite.
  */
 function sampleRules(rules: RuleRecord[]): RuleRecord[] {
-  const bySize = [...rules].sort((a, b) => b.bytes - a.bytes);
-  const picked = [rules[0], rules[rules.length - 1], bySize[0]];
+  const longestBy = (measure: (rule: RuleRecord) => number): RuleRecord =>
+    [...rules].sort((a, b) => measure(b) - measure(a))[0];
+
+  const picked = [
+    rules[0],
+    rules[rules.length - 1],
+    longestBy((rule) => rule.bytes),
+    longestBy((rule) => rule.title.length),
+    longestBy((rule) => rule.path.length),
+  ];
   return [...new Map(picked.map((rule) => [rule.url, rule])).values()];
 }
 
@@ -247,11 +257,17 @@ test.describe('rules surface: cross-theme rendering', () => {
   }
 
   for (const theme of THEMES) {
-    test(`${theme} theme: /rules and a rule page have no horizontal overflow at 375px`, async ({ page }) => {
-      const [rule] = sampleRules(allRules());
+    test(`${theme} theme: /rules and every sampled rule page have no horizontal overflow at 375px`, async ({
+      page,
+    }) => {
+      // Every sampled detail page, not just the first: the index covers
+      // the longest declared path (it renders every row), but a per-page
+      // overflow from an unusually long title or path only shows on the
+      // page that carries it.
+      const paths = ['/rules', ...sampleRules(allRules()).map((rule) => rule.url)];
       await page.setViewportSize({ width: 375, height: 700 });
 
-      for (const path of ['/rules', rule.url]) {
+      for (const path of paths) {
         await page.goto(`${path}?theme=${theme}`);
         const { scrollWidth, viewportWidth } = await page.evaluate(() => ({
           scrollWidth: document.scrollingElement?.scrollWidth ?? 0,

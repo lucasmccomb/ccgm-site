@@ -5,10 +5,17 @@
  * catalog groups by, and always all five sections, so "5 categories" stays
  * a structural guarantee rather than a property of this week's census.
  *
- * Presentation matches the restyled catalog exactly: hairline-separated
- * rows, no cards, a quiet meta line per row. Every value on the page is
- * derived from the ingested index at the pinned SHA -- the rule count in
- * particular is counted here, never written down.
+ * Presentation matches the restyled catalog: hairline-separated rows, no
+ * cards, a quiet meta line per row. Matching it under the shipped default
+ * takes two things, not one -- these local styles AND the muted-secondary
+ * selectors in src/styles/themes/mono.css, which is keyed on an explicit
+ * selector list and therefore does not reach a new class on its own.
+ * .rule-row__meta and section[data-rule-category-section] h2 are named
+ * there alongside their .module-row / [data-category-section] analogues.
+ *
+ * Every value on the page is derived from the ingested index at the
+ * pinned SHA -- the rule count in particular is counted here, never
+ * written down.
  */
 import Base from '../../layouts/Base.astro';
 import { loadModulesIndex } from '../../lib/generated.ts';

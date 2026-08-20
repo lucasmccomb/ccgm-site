@@ -16,7 +16,7 @@
  */
 import { buildMarkdownTwin } from './markdown.ts';
 import { fenceFor, mergeFragmentTwinNote, PER_MODULE_TWIN_CAP_BYTES } from './module-twin.ts';
-import { estimateTokens } from './site.ts';
+import { blobUrlFor, estimateTokens } from './site.ts';
 import { CATEGORY_VALUES, type ModuleRecord } from './schema.ts';
 
 /** The `module.json` file `type` this surface indexes. One of KNOWN_FILE_TYPES. */
@@ -71,10 +71,53 @@ export function ruleSlug(path: string): string {
   return slug || 'rule';
 }
 
-/** A rule's display title: its own first markdown H1, or its file name when it has none. */
+/**
+ * A rule's display title: its own first markdown H1, or its file name when
+ * it has none.
+ *
+ * Two regions are skipped before scanning, because a `#` inside either is
+ * not a heading and would otherwise become the rule's `<h1>`, its
+ * `<title>`, its index-row label and its twin heading:
+ *
+ *  - a leading `---` YAML front-matter block, where `# note` is a comment
+ *    (systematic-debugging/rules/debugging.md already ships front matter);
+ *  - fenced code regions, where `# note` is usually a shell comment.
+ */
 export function ruleTitle(content: string, path: string): string {
-  const heading = content.split('\n').find((line) => /^#\s+\S/.test(line));
-  if (heading) return heading.replace(/^#\s+/, '').trim();
+  const lines = content.split('\n');
+  let index = 0;
+
+  if (lines[0]?.trim() === '---') {
+    const close = lines.findIndex((line, i) => i > 0 && line.trim() === '---');
+    // No closing marker means that `---` was a horizontal rule, not front
+    // matter -- scan from the top rather than swallowing the whole file.
+    if (close !== -1) index = close + 1;
+  }
+
+  // A fence closes only on the same marker character, at least as long as
+  // the one that opened it (CommonMark), so a shorter run inside a block
+  // cannot end it early -- the same rule fenceFor() relies on when it
+  // escalates a twin's fence.
+  let openFence: string | null = null;
+
+  for (; index < lines.length; index += 1) {
+    const line = lines[index];
+    const fence = /^ {0,3}(`{3,}|~{3,})/.exec(line)?.[1];
+
+    if (fence) {
+      if (openFence === null) {
+        openFence = fence;
+      } else if (fence[0] === openFence[0] && fence.length >= openFence.length) {
+        openFence = null;
+      }
+      continue;
+    }
+
+    if (openFence === null && /^#\s+\S/.test(line)) {
+      return line.replace(/^#\s+/, '').trim();
+    }
+  }
+
   return path.replace(/^rules\//, '').replace(/\.md$/i, '');
 }
 
@@ -131,7 +174,7 @@ export function collectRules(modules: ModuleRecord[]): RuleRecord[] {
         isMergeFragment: file.isMergeFragment,
         hasSubstitutionPlaceholders: file.hasSubstitutionPlaceholders,
         rawUrl: file.rawUrl,
-        sourceUrl: `${mod.sourceUrl.replace('/tree/', '/blob/')}/${file.path}`,
+        sourceUrl: blobUrlFor(mod.sourceUrl, file.path),
         url: rulePageUrl(mod.name, slug),
         twinUrl: ruleTwinUrl(mod.name, slug),
       });
@@ -180,7 +223,12 @@ export function renderRuleTwinBody(rule: RuleRecord, options: RenderRuleTwinBody
   lines.push(`- Module: ${rule.moduleDisplayName} (${siteUrl}/modules/${rule.moduleName}.md)`);
   lines.push(`- Category: ${rule.category}`);
   lines.push(`- Declared path: \`${rule.path}\``);
-  lines.push(`- Installs to: \`${rule.target}\``);
+  // The install destination, not a repeat of the declared path above it:
+  // `target` is module-relative, so the ~/.claude/ prefix is what makes
+  // this line answer "where does this file land". Inlined here rather than
+  // imported from rulespagecopy.ts, the same way mergeFragmentTwinNote()
+  // inlines ~/.claude/settings.json (see the '## Rule text' note below).
+  lines.push(`- Installs to: \`~/.claude/${rule.target}\``);
   lines.push(`- Size: ${rule.bytes} bytes (~${rule.tokens} tokens, always loaded)`);
   lines.push(`- Raw: ${siteUrl}${rule.rawUrl}`);
   lines.push(`- Source: ${rule.sourceUrl}`);

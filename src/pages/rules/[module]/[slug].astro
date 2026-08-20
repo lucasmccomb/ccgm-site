@@ -19,7 +19,8 @@ import Base from '../../../layouts/Base.astro';
 import CopyButton from '../../../components/CopyButton.astro';
 import { loadModulesIndex } from '../../../lib/generated.ts';
 import { computeInlineBudget } from '../../../lib/inline-budget.ts';
-import { collectRules, type RuleRecord } from '../../../lib/rules.ts';
+import { collectRules, RULE_FILE_TYPE, type RuleRecord } from '../../../lib/rules.ts';
+import { previewOf } from '../../../lib/site.ts';
 import {
   MERGE_FRAGMENT_ANNOTATION,
   MERGE_FRAGMENT_COPY_LABEL,
@@ -63,7 +64,7 @@ const [decision] = computeInlineBudget([
   {
     path: rule.path,
     content: rule.content,
-    type: 'rule',
+    type: RULE_FILE_TYPE,
     hasSubstitutionPlaceholders: rule.hasSubstitutionPlaceholders,
     isMergeFragment: rule.isMergeFragment,
     rawUrl: rule.rawUrl,
@@ -71,10 +72,6 @@ const [decision] = computeInlineBudget([
   },
 ]).items;
 const inlined = decision.inlined;
-
-const PREVIEW_CHARS = 800;
-const preview =
-  rule.content.length <= PREVIEW_CHARS ? rule.content : `${rule.content.slice(0, PREVIEW_CHARS)}…`;
 
 const bodyId = 'rule-body';
 const headingId = 'rule-body-heading';
@@ -121,7 +118,7 @@ const headingId = 'rule-body-heading';
       ) : (
         <Fragment>
           <p data-rule-truncated-note>{ruleTooLargeToInlineText(rule.bytes)}</p>
-          <pre tabindex="0" aria-labelledby={headingId} class="rule-body rule-body--preview" data-rule-preview>{preview}</pre>
+          <pre tabindex="0" aria-labelledby={headingId} class="rule-body rule-body--preview" data-rule-preview>{previewOf(rule.content)}</pre>
           <CopyButton
             sourceUrl={rule.rawUrl}
             label={`the ${rule.path} rule`}
@@ -173,8 +170,12 @@ const headingId = 'rule-body-heading';
     word-break: break-all;
   }
 
-  /* Identical to ModuleFileSection.astro's file body: this IS a module
-     file body, shown on its own page. */
+  /*
+   * The same treatment ModuleFileSection.astro gives a file body -- this
+   * IS a module file body -- with one deliberate difference: a taller
+   * max-height, because the rule owns the whole page here instead of
+   * sharing it with every other file in its module.
+   */
   .rule-body {
     background: var(--color-surface-2);
     border: 1px solid var(--color-border);

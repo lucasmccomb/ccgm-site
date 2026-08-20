@@ -1,5 +1,38 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { RESERVED_ROUTES, estimateTokens, summarize } from '../../src/lib/site.ts';
+import {
+  PREVIEW_CHARS,
+  RESERVED_ROUTES,
+  blobUrlFor,
+  estimateTokens,
+  previewOf,
+  summarize,
+} from '../../src/lib/site.ts';
+
+describe('previewOf', () => {
+  it('returns content shorter than the budget unchanged, with no ellipsis', () => {
+    expect(previewOf('short body')).toBe('short body');
+    expect(previewOf('x'.repeat(PREVIEW_CHARS))).toBe('x'.repeat(PREVIEW_CHARS));
+  });
+
+  it('truncates at the budget and marks the cut', () => {
+    const result = previewOf('x'.repeat(PREVIEW_CHARS + 50));
+    expect(result).toBe(`${'x'.repeat(PREVIEW_CHARS)}…`);
+  });
+});
+
+describe('blobUrlFor', () => {
+  it('turns a module tree URL into a blob URL for one file, keeping the pinned SHA', () => {
+    expect(blobUrlFor('https://github.com/lucasmccomb/ccgm/tree/abc123/modules/verification', 'rules/verification.md')).toBe(
+      'https://github.com/lucasmccomb/ccgm/blob/abc123/modules/verification/rules/verification.md',
+    );
+  });
+
+  it('rewrites only the /tree/ path segment, not a later occurrence of the word', () => {
+    expect(blobUrlFor('https://github.com/o/r/tree/sha/modules/tree-sitter', 'rules/tree.md')).toBe(
+      'https://github.com/o/r/blob/sha/modules/tree-sitter/rules/tree.md',
+    );
+  });
+});
 
 describe('estimateTokens', () => {
   it('approximates chars / 4, rounded up', () => {

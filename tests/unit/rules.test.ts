@@ -101,12 +101,43 @@ describe('ruleTitle', () => {
     );
   });
 
-  it('ignores deeper headings and front matter when picking the H1', () => {
+  it('ignores headings deeper than H1', () => {
     expect(ruleTitle('## Sub\n\n# Real Title\n', 'rules/x.md')).toBe('Real Title');
+  });
+
+  it('skips a leading YAML front-matter block, including a comment line inside it', () => {
+    const content = ['---', 'name: debugging', '# this is a YAML comment, not the title', '---', '', '# Real Title', ''].join(
+      '\n',
+    );
+    expect(ruleTitle(content, 'rules/debugging.md')).toBe('Real Title');
+  });
+
+  it('treats an unclosed leading --- as a horizontal rule, not front matter, and still finds the H1', () => {
+    expect(ruleTitle('---\n\n# Real Title\n', 'rules/x.md')).toBe('Real Title');
+  });
+
+  it('ignores a # inside a fenced code block', () => {
+    const content = ['```bash', '# not a heading, a shell comment', '```', '', '# Real Title', ''].join('\n');
+    expect(ruleTitle(content, 'rules/x.md')).toBe('Real Title');
+  });
+
+  it('does not let a shorter backtick run inside a longer fence end the block early', () => {
+    const content = ['````md', '```', '# still inside the outer fence', '```', '````', '', '# Real Title', ''].join('\n');
+    expect(ruleTitle(content, 'rules/x.md')).toBe('Real Title');
+  });
+
+  it('ignores a # inside a tilde-fenced block, and does not let backticks close it', () => {
+    const content = ['~~~', '# not a heading', '```', '~~~', '', '# Real Title', ''].join('\n');
+    expect(ruleTitle(content, 'rules/x.md')).toBe('Real Title');
   });
 
   it('falls back to the file name when the rule has no H1 at all', () => {
     expect(ruleTitle('no heading here\n', 'rules/git-workflow.md')).toBe('git-workflow');
+  });
+
+  it('falls back to the file name when the only # lives in front matter or a fence', () => {
+    expect(ruleTitle('---\n# comment\n---\n\nbody\n', 'rules/only-front-matter.md')).toBe('only-front-matter');
+    expect(ruleTitle('```\n# comment\n```\n\nbody\n', 'rules/only-fenced.md')).toBe('only-fenced');
   });
 });
 
@@ -218,6 +249,18 @@ describe('buildRuleTwin', () => {
     expect(capped).toBe(false);
     expect(text).toContain(rule.content);
     expect(text).toContain('```');
+  });
+
+  it('states a real install destination, distinct from the declared path above it', () => {
+    const rule = fixtureRule();
+    const { text } = buildRuleTwin(rule, { siteUrl: SITE_URL, sourceSha: 'fixturesha', frontMatter });
+
+    expect(text).toContain(`- Declared path: \`${rule.path}\``);
+    expect(text).toContain(`- Installs to: \`~/.claude/${rule.target}\``);
+    // The two lines must not be byte-identical: a target that renders as a
+    // repeat of the declared path tells an agent nothing about where the
+    // file lands.
+    expect(text).not.toContain(`- Installs to: \`${rule.target}\`\n`);
   });
 
   it('links every self-referential URL absolutely against SITE_URL', () => {

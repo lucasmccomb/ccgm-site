@@ -495,7 +495,6 @@ Done. 2 removed, 1 preserved, 0 skipped, 1 branch(es) deleted.`,
     whatHappens: [
       'The command reads a rule file, pulls out its Iron Law, and generates five to seven adversarial scenarios that each combine three or more pressure vectors. It dispatches sub-agents against those scenarios twice -- once without the rule loaded to establish a baseline, once with it -- and records where the rule held and where an agent talked its way past it.',
       'The rationalizations it captures are added to the rule\'s Rationalizations Table and the red flags to its Red Flags list. The run then re-tests against fresh scenarios to check the hardening held, and the report closes on one of three recommendations: ship as-is, iterate further, or sharpen the Iron Law.',
-      'The invocation below is authored: the command takes a path to a rule file, and the doc uses this same verification-rule path as its own example.',
     ],
     blocks: [
       {
@@ -606,6 +605,30 @@ export function resolveSource(index: ModulesIndex, source: ExampleSource): Resol
 /** Every block on the page, flattened -- the unit test's and the twin's entry point. */
 export function allBlocks(examples: CommandExample[] = COMMAND_EXAMPLES): ExampleBlock[] {
   return examples.flatMap((example) => example.blocks);
+}
+
+/**
+ * THE VERBATIM CONTRACT, as a function: true when `needle` occurs in `haystack`
+ * as a byte-exact, contiguous run of WHOLE lines.
+ *
+ * Whole lines, not a bare substring. A block labelled "quoted byte-for-byte
+ * from the module file" that is really backed by a fragment from the middle of
+ * a longer line -- three characters lifted out of a heading, say -- reads on the
+ * page as "the doc shows this line" when the doc does not.
+ *
+ * It lives here, beside the type it defines, because BOTH gates that enforce it
+ * call it: the unit suite against the ingested corpus, and the e2e suite against
+ * the served raw endpoints. One implementation, so the two doors cannot drift
+ * into asserting different contracts.
+ */
+export function containsWholeLineRun(haystack: string, needle: string): boolean {
+  const lines = haystack.split('\n');
+  const needleLines = needle.split('\n');
+
+  for (let i = 0; i + needleLines.length <= lines.length; i++) {
+    if (lines.slice(i, i + needleLines.length).join('\n') === needle) return true;
+  }
+  return false;
 }
 
 /** Count of blocks by provenance, rendered as the page's own honesty tally. */

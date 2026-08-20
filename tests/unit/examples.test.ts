@@ -5,6 +5,7 @@ import {
   COMMAND_EXAMPLES,
   PROVENANCE_LABEL,
   allBlocks,
+  containsWholeLineRun,
   provenanceCounts,
   provenanceTallyLine,
   resolveSource,
@@ -70,25 +71,6 @@ function escapeHtml(value: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
-}
-
-/**
- * True when `needle` occurs in `haystack` as a contiguous run of WHOLE lines.
- *
- * A bare substring check would let a block labelled "quoted byte-for-byte from
- * the module file" be backed by a fragment from the middle of a longer line --
- * three characters lifted out of a heading, say -- which a reader takes as "the
- * doc shows this line" when the doc does not. Whole-line matching is what makes
- * the verbatim label mean what the page says it means.
- */
-function containsWholeLineRun(haystack: string, needle: string): boolean {
-  const lines = haystack.split('\n');
-  const needleLines = needle.split('\n');
-
-  for (let i = 0; i + needleLines.length <= lines.length; i++) {
-    if (lines.slice(i, i + needleLines.length).join('\n') === needle) return true;
-  }
-  return false;
 }
 
 /** The ingested body of one declared file, or a loud failure naming the gap. */
@@ -299,6 +281,33 @@ describe('examples: the built page carries the labelling contract (dist-reading,
         `block "${block.id}" is not rendered byte-for-byte in dist/examples/index.html ` +
           '(whitespace inside a <pre> is content -- check for a stray newline or lost padding)',
       ).toContain(`>${escapeHtml(block.text)}</pre>`);
+    }
+  });
+
+  it('every block <pre> is named by a caption heading that actually exists on the page', () => {
+    // axe cannot catch this: its scrollable-region-focusable rule only requires
+    // the <pre> to be focusable, not named. Without the pairing a screen-reader
+    // user tabs fourteen unlabelled scroll regions of raw template text with no
+    // clue which command each belongs to -- so assert both halves, since an
+    // aria-labelledby pointing at an id that is not on the page resolves to no
+    // accessible name at all and would look identical in the markup.
+    const html = builtExamplesHtml();
+
+    for (const block of allBlocks()) {
+      const captionId = `${block.id}-caption`;
+
+      const pre = new RegExp(`<pre[^>]*\\bid="${block.id}"[^>]*\\baria-labelledby="${captionId}"[^>]*>`);
+      expect(
+        pre.test(html),
+        `block "${block.id}" <pre> does not carry aria-labelledby="${captionId}"`,
+      ).toBe(true);
+
+      const heading = new RegExp(`<h3[^>]*\\bid="${captionId}"[^>]*>`);
+      expect(
+        heading.test(html),
+        `no <h3 id="${captionId}"> on the page -- block "${block.id}" names a caption that does not ` +
+          'exist, so its <pre> has no accessible name',
+      ).toBe(true);
     }
   });
 

@@ -6,6 +6,7 @@ import {
   NO_INVENTED_OUTPUT_NOTE,
   PROVENANCE_LABEL,
   allBlocks,
+  containsWholeLineRun,
   provenanceTallyLine,
 } from '../src/lib/examples.ts';
 import { THEMES } from '../src/lib/site.ts';
@@ -145,10 +146,15 @@ test.describe('examples page: sourcing-honesty labelling contract', () => {
     expect(seen.size).toBeGreaterThan(0);
   });
 
-  test('every quoted block is byte-exact against the raw endpoint it cites', async ({ request }) => {
-    // The end-to-end version of the unit suite's substring check: fetch the
-    // file the page actually links to and confirm the quoted block is really
-    // in it. A verbatim label the served corpus does not back is the exact
+  test('every quoted block is a byte-exact run of WHOLE LINES in the raw endpoint it cites', async ({
+    request,
+  }) => {
+    // The end-to-end version of the unit suite's verbatim gate, and deliberately
+    // the SAME contract: both call containsWholeLineRun from src/lib/examples.ts
+    // rather than each spelling out its own match, so the two doors cannot drift
+    // into asserting different things. What differs is the corpus -- the unit
+    // suite reads the ingested index, this fetches the file the page actually
+    // links to. A verbatim label the SERVED corpus does not back is the exact
     // failure this page's whole premise rests on avoiding.
     for (const block of allBlocks()) {
       if (block.provenance !== 'verbatim') continue;
@@ -157,12 +163,15 @@ test.describe('examples page: sourcing-honesty labelling contract', () => {
       for (const source of block.sources) {
         const response = await request.get(`/modules/${source.module}/files/${source.path}.txt`);
         expect(response.ok()).toBeTruthy();
-        if ((await response.text()).includes(block.text)) {
+        if (containsWholeLineRun(await response.text(), block.text)) {
           found = true;
           break;
         }
       }
-      expect(found, `block "${block.id}" is labelled verbatim but is not in any cited raw file`).toBe(true);
+      expect(
+        found,
+        `block "${block.id}" is labelled verbatim but is not a run of whole lines in any cited raw file`,
+      ).toBe(true);
     }
   });
 

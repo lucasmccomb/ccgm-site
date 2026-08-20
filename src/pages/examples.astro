@@ -1,0 +1,287 @@
+---
+/**
+ * Command examples page (#23): representative slash-command sessions, each
+ * block carrying the module file it was traced to.
+ *
+ * Every fact about ccgm on this page -- module display names, categories,
+ * raw-file URLs -- is resolved from the ingested index at build time via
+ * `resolveSource`, never hand-authored (§1.4 principle 2). A source whose
+ * module or file no longer exists throws there, so a stale attribution fails
+ * the build instead of rendering a dead link.
+ *
+ * Every command/output <pre> carries tabindex="0", the same a11y fix every
+ * other command block on the site uses (index.astro, install.astro,
+ * agents.astro, ModuleFileSection.astro): axe's scrollable-region-focusable
+ * rule fires once a block overflows horizontally, which several of these do in
+ * the mono theme's 40rem column.
+ *
+ * Design: mono's hairline treatment (#21) -- rule-separated sections, no cards,
+ * no fills except on the code blocks themselves. The command and output blocks
+ * keep --font-mono because they are code; every other line on the page takes
+ * the theme's own body stack.
+ */
+import Base from '../layouts/Base.astro';
+import { loadModulesIndex } from '../lib/generated.ts';
+import {
+  ANCHORS_HEADING,
+  COMMAND_EXAMPLES,
+  EXAMPLES_DESCRIPTION,
+  EXAMPLES_HEADING,
+  EXAMPLES_INTRO,
+  EXAMPLES_TITLE,
+  NO_INVENTED_OUTPUT_NOTE,
+  PROVENANCE_EXPLAINER,
+  PROVENANCE_LABEL,
+  SOURCE_LABEL,
+  SOURCING_HEADING,
+  provenanceTallyLine,
+  resolveSource,
+} from '../lib/examples.ts';
+
+// Same validated single source examples.md.ts reads -- a missing or malformed
+// src/generated/modules-index.json fails the build loudly rather than silently
+// rendering attributions that point nowhere.
+const index = loadModulesIndex();
+
+const examples = COMMAND_EXAMPLES.map((example) => ({
+  ...example,
+  blocks: example.blocks.map((block) => ({
+    ...block,
+    resolvedSources: block.sources.map((source) => resolveSource(index, source)),
+  })),
+}));
+
+const tally = provenanceTallyLine();
+---
+
+<Base title={EXAMPLES_TITLE} description={EXAMPLES_DESCRIPTION}>
+  <h1>{EXAMPLES_HEADING}</h1>
+  <p>{EXAMPLES_INTRO}</p>
+
+  <section class="sourcing" aria-labelledby="sourcing-heading">
+    <h2 id="sourcing-heading">{SOURCING_HEADING}</h2>
+    <dl class="sourcing__list">
+      <div class="sourcing__item">
+        <dt data-provenance-term="verbatim">{PROVENANCE_LABEL.verbatim}</dt>
+        <dd>{PROVENANCE_EXPLAINER.verbatim}</dd>
+      </div>
+      <div class="sourcing__item">
+        <dt data-provenance-term="illustrative">{PROVENANCE_LABEL.illustrative}</dt>
+        <dd>{PROVENANCE_EXPLAINER.illustrative}</dd>
+      </div>
+    </dl>
+    <p data-no-invented-output>{NO_INVENTED_OUTPUT_NOTE}</p>
+    <p data-provenance-tally>{tally}</p>
+  </section>
+
+  {
+    examples.map((example) => (
+      <section class="example" data-example data-example-id={example.id} aria-labelledby={`${example.id}-heading`}>
+        <h2 class="example__heading" id={`${example.id}-heading`}>
+          <code>{example.command}</code>
+        </h2>
+        <p class="example__summary">{example.summary}</p>
+        <p class="example__module">
+          Ships in{' '}
+          <a href={`/modules/${example.module}`} data-example-module>
+            {example.module}
+          </a>
+        </p>
+
+        {example.whatHappens.map((paragraph) => (
+          <p class="example__prose">{paragraph}</p>
+        ))}
+
+        {example.blocks.map((block) => (
+          <div
+            class="block"
+            data-example-block
+            data-block-id={block.id}
+            data-provenance={block.provenance}
+          >
+            <h3 class="block__caption">{block.caption}</h3>
+            <p
+              class="block__provenance"
+              data-provenance-label={block.id}
+              data-illustrative-label={block.provenance === 'illustrative' ? block.id : undefined}
+            >
+              {PROVENANCE_LABEL[block.provenance]}
+            </p>
+            {/* No whitespace between the tags and the expression: <pre>
+                preserves it literally, which would prepend a newline to
+                every quoted block and break the byte-exactness the unit
+                test asserts against the ingested source. */}
+            <pre id={block.id} tabindex="0" class="block__body">{block.text}</pre>
+            <p class="block__source">
+              {SOURCE_LABEL}:{' '}
+              {/* Each attribution stays on ONE source line: a newline
+                  between the closing </a> and the separator renders as a
+                  literal space, which would print "gs.md , retro.md". */}
+              {block.resolvedSources.map((source, i) => (
+                <Fragment><a href={source.modulePath}>{source.displayName}</a>{' / '}<a href={source.rawUrl} data-source-file><code>{source.path}</code></a>{i < block.resolvedSources.length - 1 ? ', ' : ''}</Fragment>
+              ))}
+            </p>
+            {block.provenance === 'illustrative' && block.anchors && (
+              <details class="block__anchors" data-anchors-for={block.id}>
+                <summary>
+                  {ANCHORS_HEADING} ({block.anchors.length})
+                </summary>
+                <ul>
+                  {block.anchors.map((anchor) => (
+                    <li data-anchor={block.id}>
+                      <code class="block__anchor-text">{anchor.text}</code>
+                      <span class="block__anchor-note">{anchor.licenses}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        ))}
+      </section>
+    ))
+  }
+</Base>
+
+<style>
+  /*
+   * Hairline sections, not cards (#21). The rule sits above each example so
+   * the first one under the sourcing key reads as a separator rather than a
+   * box, and the last example leaves no orphaned line below it.
+   */
+  .sourcing {
+    margin-top: calc(var(--space-unit) * 2);
+  }
+
+  .sourcing__list {
+    margin: var(--space-unit) 0;
+    display: grid;
+    gap: 0;
+  }
+
+  .sourcing__item {
+    border-bottom: 1px solid var(--color-border);
+    padding: calc(var(--space-unit) * 0.5) 0;
+  }
+
+  .sourcing__list dt {
+    font-weight: 500;
+  }
+
+  .sourcing__list dd {
+    margin: 0;
+  }
+
+  /*
+   * Tailwind's preflight zeroes paragraph margins, so two consecutive body
+   * paragraphs would otherwise run together with no gap at all.
+   */
+  .sourcing > p {
+    margin: var(--space-unit) 0 0 0;
+    max-width: var(--measure);
+  }
+
+  .example {
+    border-top: 1px solid var(--color-border);
+    margin-top: calc(var(--space-unit) * 2);
+    padding-top: calc(var(--space-unit) * 1.5);
+  }
+
+  .example__heading {
+    margin: 0;
+  }
+
+  /* A slash command IS code, so it keeps the mono face even though the
+     surrounding heading takes the theme's display stack. */
+  .example__heading code {
+    font-family: var(--font-mono);
+  }
+
+  .example__summary {
+    margin: calc(var(--space-unit) * 0.25) 0 0 0;
+    max-width: var(--measure);
+  }
+
+  .example__module {
+    margin: calc(var(--space-unit) * 0.25) 0 0 0;
+    font-size: 0.8125rem;
+  }
+
+  .example__prose {
+    margin: var(--space-unit) 0 0 0;
+    max-width: var(--measure);
+  }
+
+  .block {
+    margin-top: calc(var(--space-unit) * 1.25);
+  }
+
+  .block__caption {
+    margin: 0;
+    font-weight: 500;
+  }
+
+  .block__provenance,
+  .block__source {
+    margin: 0;
+    font-size: 0.8125rem;
+  }
+
+  .block__body {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: var(--space-unit);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    overflow-x: auto;
+    white-space: pre;
+    margin: calc(var(--space-unit) * 0.5) 0;
+    /*
+     * JetBrains Mono ships coding ligatures, which render `->` as a single
+     * arrow glyph. Everywhere else on the site that is a nicety; on a page
+     * whose whole claim is "these are the bytes in the module file", a glyph
+     * that is not the character underneath it undercuts the claim. Scoped to
+     * this component only -- no theme or sibling page changes.
+     */
+    font-variant-ligatures: none;
+  }
+
+  .block__source code {
+    font-family: var(--font-mono);
+  }
+
+  .block__anchors {
+    margin-top: calc(var(--space-unit) * 0.5);
+    font-size: 0.8125rem;
+  }
+
+  .block__anchors ul {
+    list-style: none;
+    margin: calc(var(--space-unit) * 0.5) 0 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0;
+  }
+
+  .block__anchors li {
+    display: grid;
+    gap: calc(var(--space-unit) * 0.125);
+    border-bottom: 1px solid var(--color-border);
+    padding: calc(var(--space-unit) * 0.5) 0;
+  }
+
+  /*
+   * An anchor is a literal fragment of a source file -- it keeps the mono
+   * face and wraps rather than scrolling, because these sit inside a
+   * <details> and a scroll container there would need its own keyboard
+   * affordance for no reading benefit.
+   */
+  .block__anchor-text {
+    font-family: var(--font-mono);
+    overflow-wrap: anywhere;
+    /* Same reason as .block__body: an anchor is a literal fragment of a
+       source file, so it must render as the characters it contains. */
+    font-variant-ligatures: none;
+  }
+</style>

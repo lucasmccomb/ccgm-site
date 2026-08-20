@@ -5,7 +5,7 @@
  * rather than threading a prop through every page.
  *
  * Every twin this site serves is produced by a `.md.ts` endpoint at the
- * exact paths enumerated below (src/pages/{index,install,agents}.md.ts,
+ * exact paths enumerated below (src/pages/{index,install,agents,examples}.md.ts,
  * src/pages/modules/index.md.ts, src/pages/modules/[name].md.ts,
  * src/pages/rules/index.md.ts, src/pages/rules/[module]/[slug].md.ts) --
  * this function only encodes the mapping, it does not generate or validate
@@ -19,6 +19,7 @@ export function mdTwinUrlFor(pathname: string): string | null {
   if (path === '/') return '/index.md';
   if (path === '/install') return '/install.md';
   if (path === '/agents') return '/agents.md';
+  if (path === '/examples') return '/examples.md';
   if (path === '/modules') return '/modules/index.md';
   if (path === '/rules') return '/rules/index.md';
 

@@ -126,18 +126,31 @@ describe('diagram specs (structural)', () => {
     },
   );
 
+  it('WIDEST_ADVANCE is the face estimateTextWidth(mono) measures at, and it really is the widest', () => {
+    // What the fit checks below depend on, asserted against the function's
+    // actual behaviour rather than against a repeated literal: every one of
+    // them passes `mono: true` on the claim that this is the widest advance
+    // any theme puts a label at. Pin both halves of that claim -- that
+    // `mono: true` measures at exactly WIDEST_ADVANCE, and that the sans
+    // face is genuinely narrower -- so a change to the advance table cannot
+    // leave the fit checks quietly measuring the wrong face.
+    const probe = 'diagram label';
+    expect(estimateTextWidth(probe, LABEL_FONT_SIZE, true)).toBe(probe.length * LABEL_FONT_SIZE * WIDEST_ADVANCE);
+    expect(estimateTextWidth(probe, LABEL_FONT_SIZE, false)).toBeLessThan(
+      estimateTextWidth(probe, LABEL_FONT_SIZE, true),
+    );
+  });
+
   it.each(DIAGRAMS.map((spec) => [spec.id, spec] as [string, DiagramSpec]))(
     '%s never renders a label or a path wider than the box holding it, measured at the widest face any theme uses',
     (_id, spec) => {
       const overflowing: string[] = [];
 
-      // Labels are measured at WIDEST_ADVANCE, not the sans advance: ascii
-      // sets --font-body to JetBrains Mono, so a "body face" label renders
-      // ~7% wider there than under the other three themes. Measuring at the
-      // narrower face would pass a label that clips under ascii.
-      const widestIsMono = WIDEST_ADVANCE === 0.6;
-      expect(widestIsMono, 'WIDEST_ADVANCE no longer matches the mono advance this check passes').toBe(true);
-
+      // Labels are measured at WIDEST_ADVANCE (see the standalone assertion
+      // below for why `mono: true` is that face): ascii sets --font-body to
+      // JetBrains Mono, so a "body face" label renders ~7% wider there than
+      // under the other three themes. Measuring at the narrower face would
+      // pass a label that clips under ascii.
       for (const node of spec.nodes) {
         const available = node.w - NODE_PADDING_X;
         if (node.label && estimateTextWidth(node.label, LABEL_FONT_SIZE, true) > available) {

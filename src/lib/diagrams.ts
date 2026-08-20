@@ -131,13 +131,13 @@ export interface DiagramRef {
 export interface DiagramSpec {
   /** Unique, URL-safe; ids inside the SVG are derived from it. */
   id: string;
-  /** The `<h2>` above the figure. */
+  /** The `<h2>` that opens the diagram's `<section>` and names its SVG scroll container. */
   heading: string;
   /** The SVG's accessible name (`<title>`). */
   title: string;
   /** What the drawing looks like -- the SVG's `<desc>`. */
   desc: string;
-  /** The claim the diagram makes, rendered as visible prose above the figure. */
+  /** The claim the diagram makes, rendered as visible prose between the heading and the SVG. */
   summary: string;
   /** The image-free fallback: the same flow as an ordered list. */
   steps: string[];

@@ -19,6 +19,19 @@ unit tests (the inline-emission guard, the webfont `url()` resolution check,
 the reserved-route guard) read `dist/` and fail loudly -- never skip -- when
 it does not exist yet.
 
+Set this once per clone of this repo:
+
+```bash
+git config commit.cleanup whitespace
+```
+
+Commit subjects here start with the issue number (`#26: short description`).
+Git's default cleanup mode strips lines beginning with `#` as comments whenever
+a message goes through an editor -- which `git rebase --continue` does, using
+`--cleanup=strip` -- so a rebase silently deletes the subject line and promotes
+the body's first line in its place. `whitespace` keeps the `#` and only trims
+trailing whitespace and blank lines.
+
 ## Architecture overview
 
 This is a static site with no server, no database, and no auth. Everything

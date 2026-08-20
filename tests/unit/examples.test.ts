@@ -231,6 +231,12 @@ describe('examples: structural shape', () => {
       for (const paragraph of example.whatHappens) {
         expect(paragraph.trim().length).toBeGreaterThan(0);
       }
+      for (const block of example.blocks) {
+        // An empty body satisfies every sourcing gate vacuously: the
+        // whole-line-run check finds "" in any file, and the byte-exact dist
+        // check matches an empty <pre>. Nothing else rejects it.
+        expect(block.text.trim().length, `block "${block.id}" has an empty body`).toBeGreaterThan(0);
+      }
     }
   });
 
@@ -270,9 +276,10 @@ describe('examples: the built page carries the labelling contract (dist-reading,
     // whitespace on both sides -- so a regression that prepended a newline,
     // collapsed the two-space "[branch]" gap, or ate the recall table's column
     // padding would ship green. This reads the built markup instead: the block
-    // body sits between the <pre>'s ">" and its "</pre>" with only &, < and >
-    // escaped, so an exact match there is an exact match on the bytes a reader
-    // sees.
+    // body sits between the <pre>'s ">" and its "</pre>" with exactly the five
+    // characters escapeHtml() handles (&, <, >, ", ') escaped and every other
+    // byte literal, so an exact match there is an exact match on the bytes a
+    // reader sees.
     const html = builtExamplesHtml();
 
     for (const block of allBlocks()) {

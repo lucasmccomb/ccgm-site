@@ -392,7 +392,7 @@ test.describe('view as Markdown link', () => {
   });
 });
 
-test.describe('a11y sweep (E6-owned): /install, /agents, a mixed inline/preview module page, across all three themes', () => {
+test.describe('a11y sweep (E6-owned): /install, /agents, a mixed inline/preview module page, across every theme', () => {
   for (const theme of THEMES) {
     test(`${theme} theme: axe scan of /install has zero critical/serious violations`, async ({ page }, testInfo) => {
       test.skip(testInfo.project.name !== 'chromium', 'one authoritative a11y run per theme is enough');

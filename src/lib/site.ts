@@ -10,11 +10,19 @@
 export const SITE_URL: string =
   process.env.SITE_URL ?? process.env.CF_PAGES_URL ?? 'http://localhost:4321';
 
-/** The default shipped theme until HE3's pick lands (§3.5). */
-export const DEFAULT_THEME = 'ascii' as const;
-
-export const THEMES = ['ascii', 'minimal', 'serif'] as const;
+export const THEMES = ['mono', 'ascii', 'minimal', 'serif'] as const;
 export type Theme = (typeof THEMES)[number];
+
+/**
+ * The shipped theme (#21). Rendered statically into `<html data-theme>` by
+ * Base.astro, so the default look survives with JavaScript disabled; the
+ * other entries in THEMES stay available as `?theme=` review options.
+ *
+ * Typed as `Theme` rather than a literal so build-time branches on the
+ * value (the landing hero's wordmark-vs-ASCII-banner choice) type-check
+ * against every theme name, not just the one shipping today.
+ */
+export const DEFAULT_THEME: Theme = 'mono';
 
 /**
  * Routes reserved for the future ccgm-desktop-app plan (§3.4). Never claim

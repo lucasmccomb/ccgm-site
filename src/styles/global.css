@@ -1,14 +1,18 @@
 @import 'tailwindcss';
 
 /*
- * Three theme candidate token layers (§3.5, E3). Each file overrides the
- * frozen semantic slots below under its own `[data-theme="..."]` block.
+ * Theme token layers (§3.5, E3; `mono` added by #21). Each file overrides
+ * the frozen semantic slots below under its own `[data-theme="..."]` block.
  * Imported after the neutral placeholder root block so a theme's tokens
  * win the cascade for any element carrying that attribute -- the
  * placeholder block only ever applies before JavaScript/build-time theming
  * sets `data-theme`, which in practice is never (Base.astro always renders
  * `<html data-theme={DEFAULT_THEME}>` statically).
+ *
+ * `mono` ships as DEFAULT_THEME; the other three stay in the build as
+ * `?theme=` review options.
  */
+@import './themes/mono.css';
 @import './themes/ascii.css';
 @import './themes/minimal.css';
 @import './themes/serif.css';
@@ -127,7 +131,7 @@ body {
  * styles across themes"). A single global rule keyed on --color-accent
  * automatically adapts per data-theme without touching any theme CSS token
  * file (src/styles/themes/*.css stay E3's alone) -- the indirection through
- * the frozen token is what makes one rule correct across all three themes.
+ * the frozen token is what makes one rule correct across every theme.
  * Covers every interactive element site-wide: buttons, links, inputs,
  * tag-filter chips, CopyButton, the skip link, and the search input --
  * anything with a component-local <style> block relies on this rule rather

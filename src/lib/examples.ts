@@ -6,16 +6,24 @@
  * came from, and `tests/unit/examples.test.ts` re-derives that claim from the
  * ingested ccgm corpus rather than trusting it:
  *
- *  - `provenance: 'verbatim'` -- `text` must appear BYTE-FOR-BYTE inside one of
- *    the block's declared `sources`. The test asserts the substring directly, so
- *    a single edited character in a quoted block fails the build's test gate.
+ *  - `provenance: 'verbatim'` -- `text` must appear in one of the block's
+ *    declared `sources` as a BYTE-EXACT, CONTIGUOUS RUN OF WHOLE LINES. Whole
+ *    lines, not a bare substring: a fragment lifted out of the middle of a
+ *    longer line reads on the page as "the doc shows this" when the doc does
+ *    not. A single edited character in a quoted block fails the build's gate.
  *  - `provenance: 'illustrative'` -- the transcript is authored here. It cannot
- *    be substring-checked, so it instead carries `anchors`: one entry per
- *    documented shape the transcript rests on. Each `anchor.text` must ALSO
- *    appear byte-for-byte in one of the block's declared sources, and each
- *    `anchor.licenses` says in plain words what that anchor permits the
- *    transcript to claim. An output line with no anchor behind it is an
- *    invented capability -- cut the line rather than embellish it.
+ *    be line-checked, so it instead carries `anchors`: one entry per documented
+ *    shape the transcript rests on. Each `anchor.text` must appear byte-for-byte
+ *    in one of the block's declared sources (as a substring, because an anchor
+ *    is by definition a fragment), and each `anchor.licenses` says in plain
+ *    words what that anchor permits the transcript to claim.
+ *
+ * What that machinery does and does not prove: it proves every quoted block and
+ * every anchor really is in the file it cites, and that an authored block is
+ * labelled and carries at least one anchor. It cannot prove an authored block
+ * shows nothing beyond what its anchors license -- an extra line whose shape no
+ * anchor covers still passes. That last step is a reading, done at review time
+ * against the anchor list the page prints. Cut a line rather than embellish it.
  *
  * Every `ExampleSource` names a module and a path that must be a DECLARED,
  * text-bearing file of that module in the ingested index. The page resolves
@@ -52,19 +60,38 @@ export interface TraceAnchor {
 
 export type Provenance = 'verbatim' | 'illustrative';
 
-/** One rendered <pre> on the examples page, with its provenance attached. */
-export interface ExampleBlock {
+/** The part of a rendered block that does not depend on its provenance. */
+interface ExampleBlockBase {
   /** Unique across the whole page; becomes the <pre> element id. */
   id: string;
   /** Short label rendered above the block. */
   caption: string;
-  provenance: Provenance;
   text: string;
   /** At least one. Every source must resolve against the ingested index. */
   sources: ExampleSource[];
-  /** Required (and only meaningful) when provenance is 'illustrative'. */
-  anchors?: TraceAnchor[];
 }
+
+/** Quoted from a module file. Anchors are the illustrative-only mechanism. */
+export type VerbatimBlock = ExampleBlockBase & { provenance: 'verbatim' };
+
+/**
+ * Authored for this page. `anchors` is a NON-EMPTY tuple on purpose: an
+ * authored transcript with nothing behind it is an invented capability, so the
+ * compiler refuses it rather than a test catching it after the fact.
+ */
+export type IllustrativeBlock = ExampleBlockBase & {
+  provenance: 'illustrative';
+  anchors: [TraceAnchor, ...TraceAnchor[]];
+};
+
+/**
+ * One rendered <pre> on the examples page, with its provenance attached.
+ *
+ * A discriminated union, so the two illegal states -- an illustrative block
+ * with no anchors, a verbatim block carrying anchors -- are unrepresentable
+ * rather than policed at runtime. Consumers narrow on `provenance` alone.
+ */
+export type ExampleBlock = VerbatimBlock | IllustrativeBlock;
 
 export interface CommandExample {
   /** Unique slug; becomes the section's heading id. */
@@ -135,9 +162,20 @@ export const COMMAND_EXAMPLES: CommandExample[] = [
       {
         id: 'gs-invocation',
         caption: 'Invocation',
-        provenance: 'verbatim',
+        // Not verbatim: gs.md names the command in its H1 and inside a script
+        // path, but never shows the bare invocation as a line of its own. A
+        // three-character fragment of a heading cannot carry "quoted from the
+        // module file", so this block is anchored instead -- same treatment
+        // /pressure-test's invocation gets.
+        provenance: 'illustrative',
         text: '/gs',
         sources: [{ module: 'commands-core', path: 'commands/gs.md' }],
+        anchors: [
+          {
+            text: '# /gs - Git Status Dashboard',
+            licenses: 'The command name, which the doc carries in its heading rather than as a written-out invocation line.',
+          },
+        ],
       },
       {
         id: 'gs-output',
@@ -288,7 +326,7 @@ Files changed on branch: {diff_files}`,
     whatHappens: [
       'The command runs an installed shell script that walks every worktree of the current repository and classifies each one. Anything with uncommitted tracked changes, untracked non-ignored files, a paused rebase or merge, a lock, or a detached HEAD carrying commits no ref reaches is preserved. Clean worktrees in the managed directories are removed with a non-force git worktree remove, which is itself the last safety gate: git refuses the removal if the classification missed something.',
       'A removed worktree never costs you commits -- they survive on the branch ref. The script deletes a branch only after verifying the default branch already contains its work, either as an ancestor or as a patch-equivalent squash merge; a branch that passes neither test is kept, and the report prints the git worktree add line that restores its checkout.',
-      '--dry-run classifies and reports without changing anything. The sample below is authored, not captured: the paths, branch names, and sizes are made up, and every line of it follows an output string in the script.',
+      '--dry-run classifies and reports without changing anything.',
     ],
     blocks: [
       {
@@ -380,7 +418,6 @@ Done. 2 removed, 1 preserved, 0 skipped, 1 branch(es) deleted.`,
     whatHappens: [
       'The command runs a Python script that reads Claude Code\'s own JSONL transcripts directly. There is no separate index or database -- the transcripts are the source of truth, read on demand. Sessions from every clone of the repository are unified into one list, matched by the canonical repository name plus a known clone suffix.',
       'With no query it prints a summary of the last seven days: one line per session, most recent first. With a query it prints the matching turns instead, filtered by a case-insensitive regular expression.',
-      'The summary below is authored, not captured: the repository, dates, session ids, and messages are made up, and each column follows the format string the script prints.',
     ],
     blocks: [
       {

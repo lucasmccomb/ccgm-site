@@ -107,7 +107,7 @@ export const GET: APIRoute = () => {
       lines.push(`${SOURCE_LABEL}: ${attributions.join(', ')}`);
       lines.push('');
 
-      if (block.provenance === 'illustrative' && block.anchors) {
+      if (block.provenance === 'illustrative') {
         lines.push(`${ANCHORS_HEADING}:`);
         lines.push('');
         for (const anchor of block.anchors) {

@@ -36,7 +36,7 @@ test.describe('examples page: content', () => {
       await expect(heading).toHaveText(example.command);
       await expect(heading).toBeVisible();
       await expect(section.getByText(example.summary)).toBeVisible();
-      const moduleLink = section.locator('[data-example-module]');
+      const moduleLink = section.locator('[data-command-module]');
       await expect(moduleLink).toHaveText(example.module);
       await expect(moduleLink).toHaveAttribute('href', `/modules/${example.module}`);
     }
@@ -99,8 +99,7 @@ test.describe('examples page: sourcing-honesty labelling contract', () => {
 
     for (const block of allBlocks()) {
       if (block.provenance !== 'illustrative') continue;
-      const anchors = block.anchors ?? [];
-      expect(anchors.length, `block "${block.id}" declares no anchors`).toBeGreaterThan(0);
+      const anchors = block.anchors;
 
       const details = page.locator(`[data-anchors-for="${block.id}"]`);
       await expect(details).toHaveCount(1);
@@ -169,7 +168,8 @@ test.describe('examples page: sourcing-honesty labelling contract', () => {
 
   test('every anchor is byte-exact against the raw endpoint it cites', async ({ request }) => {
     for (const block of allBlocks()) {
-      for (const anchor of block.anchors ?? []) {
+      if (block.provenance !== 'illustrative') continue;
+      for (const anchor of block.anchors) {
         let found = false;
         for (const source of block.sources) {
           const response = await request.get(`/modules/${source.module}/files/${source.path}.txt`);
@@ -289,13 +289,13 @@ test.describe('examples page: without JavaScript', () => {
   }) => {
     await page.goto('/examples');
 
-    const illustrative = allBlocks().filter((block) => block.provenance === 'illustrative');
-    for (const block of illustrative) {
+    for (const block of allBlocks()) {
+      if (block.provenance !== 'illustrative') continue;
       const details = page.locator(`[data-anchors-for="${block.id}"]`);
       await expect(details).toHaveCount(1);
       await details.locator('summary').click();
       await expect(details).toHaveAttribute('open', '');
-      await expect(details.locator(`[data-anchor="${block.id}"]`)).toHaveCount((block.anchors ?? []).length);
+      await expect(details.locator(`[data-anchor="${block.id}"]`)).toHaveCount(block.anchors.length);
     }
   });
 });

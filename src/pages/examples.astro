@@ -62,11 +62,11 @@ const tally = provenanceTallyLine();
     <h2 id="sourcing-heading">{SOURCING_HEADING}</h2>
     <dl class="sourcing__list">
       <div class="sourcing__item">
-        <dt data-provenance-term="verbatim">{PROVENANCE_LABEL.verbatim}</dt>
+        <dt>{PROVENANCE_LABEL.verbatim}</dt>
         <dd>{PROVENANCE_EXPLAINER.verbatim}</dd>
       </div>
       <div class="sourcing__item">
-        <dt data-provenance-term="illustrative">{PROVENANCE_LABEL.illustrative}</dt>
+        <dt>{PROVENANCE_LABEL.illustrative}</dt>
         <dd>{PROVENANCE_EXPLAINER.illustrative}</dd>
       </div>
     </dl>
@@ -83,7 +83,7 @@ const tally = provenanceTallyLine();
         <p class="example__summary">{example.summary}</p>
         <p class="example__module">
           Ships in{' '}
-          <a href={`/modules/${example.module}`} data-example-module>
+          <a href={`/modules/${example.module}`} data-command-module>
             {example.module}
           </a>
         </p>
@@ -99,7 +99,7 @@ const tally = provenanceTallyLine();
             data-block-id={block.id}
             data-provenance={block.provenance}
           >
-            <h3 class="block__caption">{block.caption}</h3>
+            <h3 class="block__caption" id={`${block.id}-caption`}>{block.caption}</h3>
             <p
               class="block__provenance"
               data-provenance-label={block.id}
@@ -108,10 +108,19 @@ const tally = provenanceTallyLine();
               {PROVENANCE_LABEL[block.provenance]}
             </p>
             {/* No whitespace between the tags and the expression: <pre>
-                preserves it literally, which would prepend a newline to
-                every quoted block and break the byte-exactness the unit
-                test asserts against the ingested source. */}
-            <pre id={block.id} tabindex="0" class="block__body">{block.text}</pre>
+                preserves it literally, so a newline here would prepend one
+                to every block on the page. What guards that is the
+                dist-reading unit test "every rendered <pre> carries its
+                block body byte-for-byte" (tests/unit/examples.test.ts),
+                which compares the built markup against the declared text
+                with whitespace intact. The e2e toHaveText checks cannot:
+                Playwright normalizes whitespace on both sides.
+
+                aria-labelledby points at the caption above, so the
+                fourteen focusable scroll regions on this page announce
+                which command and which block they belong to -- same
+                pairing ModuleFileSection.astro uses. */}
+            <pre id={block.id} tabindex="0" aria-labelledby={`${block.id}-caption`} class="block__body">{block.text}</pre>
             <p class="block__source">
               {SOURCE_LABEL}:{' '}
               {/* Each attribution stays on ONE source line: a newline
@@ -121,7 +130,7 @@ const tally = provenanceTallyLine();
                 <Fragment><a href={source.modulePath}>{source.displayName}</a>{' / '}<a href={source.rawUrl} data-source-file><code>{source.path}</code></a>{i < block.resolvedSources.length - 1 ? ', ' : ''}</Fragment>
               ))}
             </p>
-            {block.provenance === 'illustrative' && block.anchors && (
+            {block.provenance === 'illustrative' && (
               <details class="block__anchors" data-anchors-for={block.id}>
                 <summary>
                   {ANCHORS_HEADING} ({block.anchors.length})

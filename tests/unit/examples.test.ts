@@ -18,14 +18,24 @@ import type { ModulesIndex } from '../../src/lib/schema.ts';
  * rather than by review. Two halves:
  *
  *  1. Against the INGESTED CORPUS -- every declared source resolves to a real,
- *     declared, text-bearing file; every `verbatim` block is a byte-exact
- *     substring of that file; every `illustrative` block's anchors are too.
- *     A quoted block that drifts from ccgm's file, or an authored transcript
- *     line with no documented shape behind it, fails here.
+ *     declared, text-bearing file; every `verbatim` block appears in that file
+ *     as a byte-exact contiguous run of WHOLE LINES; every `illustrative`
+ *     block's anchors appear byte-for-byte as substrings (an anchor is by
+ *     definition a fragment). A quoted block that drifts from ccgm's file, or
+ *     an anchor that names a shape the file does not carry, fails here.
  *  2. Against the BUILT PAGE -- every rendered block carries its provenance as
- *     an attribute, and every illustrative one carries the visible label. This
- *     half reads dist/ and MUST fail loudly when dist/ is absent, never skip
+ *     an attribute, its body byte-for-byte, and its visible label. This half
+ *     reads dist/ and MUST fail loudly when dist/ is absent, never skip
  *     (§8.1), same as every other dist-reading suite.
+ *
+ * What is NOT asserted here, and rests on review instead: that an illustrative
+ * block shows nothing beyond what its anchors license. The suite proves each
+ * anchor is real; a reader comparing the block against the anchor list the page
+ * prints is what proves the block is covered by them.
+ *
+ * The provenance/anchors correspondence itself is no longer a test at all --
+ * `ExampleBlock` is a discriminated union, so an illustrative block with no
+ * anchors and a verbatim block carrying anchors are compile errors.
  */
 
 const DIST_DIR = resolve(process.cwd(), 'dist');
@@ -45,6 +55,40 @@ function builtExamplesHtml(): string {
     throw new Error(`${path} does not exist -- the /examples page did not build`);
   }
   return readFileSync(path, 'utf-8');
+}
+
+/**
+ * Astro escapes exactly these five characters when it interpolates a value into
+ * markup; every other byte of a block body reaches the built page literally.
+ * So this is what the declared text looks like inside the rendered <pre>, and
+ * comparing against it is comparing against the bytes a reader sees.
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * True when `needle` occurs in `haystack` as a contiguous run of WHOLE lines.
+ *
+ * A bare substring check would let a block labelled "quoted byte-for-byte from
+ * the module file" be backed by a fragment from the middle of a longer line --
+ * three characters lifted out of a heading, say -- which a reader takes as "the
+ * doc shows this line" when the doc does not. Whole-line matching is what makes
+ * the verbatim label mean what the page says it means.
+ */
+function containsWholeLineRun(haystack: string, needle: string): boolean {
+  const lines = haystack.split('\n');
+  const needleLines = needle.split('\n');
+
+  for (let i = 0; i + needleLines.length <= lines.length; i++) {
+    if (lines.slice(i, i + needleLines.length).join('\n') === needle) return true;
+  }
+  return false;
 }
 
 /** The ingested body of one declared file, or a loud failure naming the gap. */
@@ -105,18 +149,22 @@ describe('examples: declared sources resolve against the ingested ccgm corpus', 
 });
 
 describe('examples: provenance contract (the sourcing-honesty gate)', () => {
-  it('every VERBATIM block appears byte-for-byte in one of its declared sources', () => {
+  it('every VERBATIM block appears in a declared source as a contiguous run of WHOLE lines', () => {
     const index = loadModulesIndex();
     const offenders: string[] = [];
 
     for (const block of allBlocks()) {
       if (block.provenance !== 'verbatim') continue;
 
-      const found = block.sources.some((source) => sourceContent(index, source).includes(block.text));
+      const found = block.sources.some((source) =>
+        containsWholeLineRun(sourceContent(index, source), block.text),
+      );
       if (!found) {
         const where = block.sources.map((s) => `${s.module}/${s.path}`).join(', ');
         offenders.push(
-          `block "${block.id}" is labelled verbatim but its text is not a byte-exact substring of ${where}`,
+          `block "${block.id}" is labelled verbatim but its text is not a byte-exact run of whole ` +
+            `lines in ${where}. A mid-line fragment does not back the "quoted from the module file" ` +
+            'label -- quote a whole line, or relabel the block illustrative and anchor it.',
         );
       }
     }
@@ -124,23 +172,18 @@ describe('examples: provenance contract (the sourcing-honesty gate)', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('every ILLUSTRATIVE block carries anchors, and every anchor appears byte-for-byte in one of its sources', () => {
+  it('every ILLUSTRATIVE anchor appears byte-for-byte in one of its block\'s sources', () => {
     const index = loadModulesIndex();
     const offenders: string[] = [];
 
     for (const block of allBlocks()) {
       if (block.provenance !== 'illustrative') continue;
 
-      const anchors = block.anchors ?? [];
-      if (anchors.length === 0) {
-        offenders.push(
-          `block "${block.id}" is labelled illustrative but declares no anchors -- an authored ` +
-            'transcript with nothing behind it is an invented capability',
-        );
-        continue;
-      }
-
-      for (const anchor of anchors) {
+      // Substring, not whole-line: an anchor is a fragment by design -- it
+      // names the one shape in the file that licenses a line of the authored
+      // transcript. That an illustrative block has at least one is guaranteed
+      // by its type, not asserted here.
+      for (const anchor of block.anchors) {
         expect(anchor.licenses.trim().length, `anchor in "${block.id}" has an empty licenses note`).toBeGreaterThan(0);
         const found = block.sources.some((source) => sourceContent(index, source).includes(anchor.text));
         if (!found) {
@@ -153,11 +196,19 @@ describe('examples: provenance contract (the sourcing-honesty gate)', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('a VERBATIM block never carries anchors (anchors are the illustrative-only mechanism)', () => {
+  it('anchors carry real text and never repeat within a block', () => {
+    // What is left of the two provenance/anchor shape tests once the union
+    // makes their subject a compile error. These two are not type-enforceable:
+    // an empty anchor names no shape, and a repeated one inflates the "(N)"
+    // count the page prints without adding a byte of traceability.
     for (const block of allBlocks()) {
-      if (block.provenance === 'verbatim') {
-        expect(block.anchors, `verbatim block "${block.id}" should not declare anchors`).toBeUndefined();
+      if (block.provenance !== 'illustrative') continue;
+
+      const texts = block.anchors.map((anchor) => anchor.text);
+      for (const text of texts) {
+        expect(text.trim().length, `block "${block.id}" declares an empty anchor`).toBeGreaterThan(0);
       }
+      expect(new Set(texts).size, `block "${block.id}" declares the same anchor twice`).toBe(texts.length);
     }
   });
 
@@ -230,6 +281,27 @@ describe('examples: the built page carries the labelling contract (dist-reading,
     }
   });
 
+  it('every rendered <pre> carries its block body byte-for-byte, whitespace included', () => {
+    // The one thing on this page nothing else checks. The corpus-side gates
+    // compare DATA against the ingested file; the e2e checks compare the page
+    // against the data through Playwright's toHaveText, which normalizes
+    // whitespace on both sides -- so a regression that prepended a newline,
+    // collapsed the two-space "[branch]" gap, or ate the recall table's column
+    // padding would ship green. This reads the built markup instead: the block
+    // body sits between the <pre>'s ">" and its "</pre>" with only &, < and >
+    // escaped, so an exact match there is an exact match on the bytes a reader
+    // sees.
+    const html = builtExamplesHtml();
+
+    for (const block of allBlocks()) {
+      expect(
+        html,
+        `block "${block.id}" is not rendered byte-for-byte in dist/examples/index.html ` +
+          '(whitespace inside a <pre> is content -- check for a stray newline or lost padding)',
+      ).toContain(`>${escapeHtml(block.text)}</pre>`);
+    }
+  });
+
   it('the number of rendered blocks equals the number of declared blocks -- no stray or missing block', () => {
     const html = builtExamplesHtml();
     const rendered = html.match(/\bdata-example-block\b/g) ?? [];
@@ -257,7 +329,7 @@ describe('examples: the built page carries the labelling contract (dist-reading,
       if (block.provenance !== 'illustrative') continue;
       const rendered = html.match(new RegExp(`data-anchor="${block.id}"`, 'g')) ?? [];
       expect(rendered.length, `block "${block.id}" rendered ${rendered.length} anchors`).toBe(
-        (block.anchors ?? []).length,
+        block.anchors.length,
       );
     }
   });
@@ -298,7 +370,8 @@ describe('examples: the built page carries the labelling contract (dist-reading,
     const twin = readFileSync(join(DIST_DIR, 'examples.md'), 'utf-8');
 
     for (const block of allBlocks()) {
-      for (const anchor of block.anchors ?? []) {
+      if (block.provenance !== 'illustrative') continue;
+      for (const anchor of block.anchors) {
         // Single-line by contract: the twin inline-codes anchors, and a
         // multi-line anchor would need a fence instead.
         expect(anchor.text, `anchor in "${block.id}" spans lines`).not.toContain('\n');

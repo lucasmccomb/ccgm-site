@@ -53,6 +53,11 @@ export function defaultDocEntries(siteUrl: string): DocEntry[] {
       url: `${siteUrl}/rules/index.md`,
       description: 'Every always-loaded rule file across all modules, grouped by category, each linking its own twin.',
     },
+    {
+      title: 'Command examples',
+      url: `${siteUrl}/examples.md`,
+      description: 'Representative slash-command sessions: what you type, what happens, and what it prints, traced to source.',
+    },
   ];
 }
 

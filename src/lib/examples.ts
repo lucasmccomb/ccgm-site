@@ -525,7 +525,7 @@ Done. 2 removed, 1 preserved, 0 skipped, 1 branch(es) deleted.`,
         text: `## Pressure-Test Report: {rule-name}
 
 **Rule file:** {path}
-**Iron Law:** {extracted Iron Law}
+**Rule:** {extracted rule statement}
 
 ### Baseline (RED) compliance: {N/total}
 ### After rule loaded (GREEN) compliance: {N/total}
@@ -548,7 +548,7 @@ Done. 2 removed, 1 preserved, 0 skipped, 1 branch(es) deleted.`,
 {any scenarios where the rule still fails, or any DONE_WITH_CONCERNS the agent raised}
 
 ### Recommendation
-{one of: ship as-is | iterate further | Iron Law needs sharpening}`,
+{one of: ship as-is | iterate further | rule statement needs sharpening}`,
         sources: [{ module: 'rule-authoring', path: 'commands/pressure-test.md' }],
       },
     ],

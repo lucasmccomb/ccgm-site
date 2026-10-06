@@ -202,7 +202,7 @@ test.describe('module detail pages: deep-check 5 representative modules', () => 
     await expectPlaceholderAnnotation(page, 'lib/com.__USERNAME__.ccgm.autoheal.daily.plist.template', true);
     await expectPlaceholderAnnotation(page, 'lib/autoheal.cron.template', true);
     // A regular, non-template rule file must NOT carry the annotation.
-    await expectPlaceholderAnnotation(page, 'rules/autoheal.md', false);
+    await expectPlaceholderAnnotation(page, 'skills/autoheal-reference/SKILL.md', false);
 
     test.skip(testInfo.project.name !== 'chromium', 'real clipboard read-back needs Chromium/CDP');
     // Representative sample: the merge fragment, a placeholder file, an
@@ -210,7 +210,7 @@ test.describe('module detail pages: deep-check 5 representative modules', () => 
     // data) the one file the 250 KB page budget pushes out of line --
     // bin/autoheal-analyze.sh -- covering both CopyButton modes.
     await expectFileCopyByteExact(page, request, 'autoheal', 'settings.partial.json');
-    await expectFileCopyByteExact(page, request, 'autoheal', 'rules/autoheal.md');
+    await expectFileCopyByteExact(page, request, 'autoheal', 'skills/autoheal-reference/SKILL.md');
     await expectFileCopyByteExact(page, request, 'autoheal', 'bin/autoheal-analyze.sh');
   });
 
@@ -231,7 +231,7 @@ test.describe('module detail pages: deep-check 5 representative modules', () => 
     // exercise the non-inlined, fetch-based CopyButton path specifically.
     await expectFileCopyByteExact(page, request, 'dreaming', 'lib/dream_analyze.py');
     await expectFileCopyByteExact(page, request, 'dreaming', 'lib/apply_dream_proposal.py');
-    await expectFileCopyByteExact(page, request, 'dreaming', 'rules/dreaming.md');
+    await expectFileCopyByteExact(page, request, 'dreaming', 'skills/dreaming/SKILL.md');
   });
 
   test('remote-server: placeholder annotation on onremote.md, merge treatment on the settings fragment', async ({
@@ -241,7 +241,7 @@ test.describe('module detail pages: deep-check 5 representative modules', () => 
     await page.goto('/modules/remote-server');
 
     await expectPlaceholderAnnotation(page, 'commands/onremote.md', true);
-    await expectPlaceholderAnnotation(page, 'rules/remote-server.md', false);
+    await expectPlaceholderAnnotation(page, 'settings.partial.json', false);
     await expectMergeTreatment(page, 'settings.partial.json');
 
     test.skip(testInfo.project.name !== 'chromium', 'real clipboard read-back needs Chromium/CDP');

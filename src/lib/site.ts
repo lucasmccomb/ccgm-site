@@ -76,7 +76,7 @@ export function blobUrlFor(moduleSourceUrl: string, filePath: string): string {
 /**
  * Reduce a description to an llms.txt-safe summary line.
  *
- * Rules (all unit-tested over the 78 real ccgm descriptions in E2):
+ * Rules (all unit-tested over the real ccgm descriptions in E2):
  *  - collapse whitespace
  *  - prefer the first sentence
  *  - hard cap at 120 chars total, cutting on a word boundary with a

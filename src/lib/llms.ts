@@ -189,7 +189,7 @@ export function validateLlmsTxtGrammar(content: string, siteUrl: string): string
   }
 
   // "- [displayName](url): summary" -- the summary (not the raw description,
-  // which exceeds 120 chars for 74/78 modules today) must stay <= 120 chars.
+  // which exceeds 120 chars for most modules today) must stay <= 120 chars.
   const moduleLinePattern = /^- \[[^\]]*\]\([^)]+\): (.+)$/;
   for (const line of lines) {
     const lineMatch = line.match(moduleLinePattern);

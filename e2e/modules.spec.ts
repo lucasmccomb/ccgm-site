@@ -35,15 +35,26 @@ function findModule(index: ModulesIndex, name: string): ModuleRecord {
 }
 
 /** The real module.json's own `files` keys, read from the ingested clone -- NOT the site's emitted JSON (§5 E5: comparing a filter's output against itself proves nothing). */
-function readRealModuleFileKeys(moduleName: string): string[] {
+function readRealModuleFiles(moduleName: string): { path: string; template: boolean }[] {
   const path = join(process.cwd(), '.ccgm-src', 'modules', moduleName, 'module.json');
   if (!existsSync(path)) {
     throw new Error(
       `.ccgm-src/modules/${moduleName}/module.json does not exist -- run \`pnpm build\` (real ingest) before \`pnpm test:e2e\``,
     );
   }
-  const manifest = JSON.parse(readFileSync(path, 'utf-8')) as { files: Record<string, unknown> };
-  return Object.keys(manifest.files);
+  const manifest = JSON.parse(readFileSync(path, 'utf-8')) as { files: Record<string, { template?: boolean }> };
+  return Object.entries(manifest.files).map(([filePath, entry]) => ({ path: filePath, template: entry.template === true }));
+}
+
+function readRealModuleFileKeys(moduleName: string): string[] {
+  return readRealModuleFiles(moduleName).map((file) => file.path);
+}
+
+/** First declared file that is not a template: it can never carry the placeholder annotation. */
+function firstPlainFile(moduleName: string): string {
+  const plain = readRealModuleFiles(moduleName).find((file) => !file.template);
+  if (!plain) throw new Error(`${moduleName} declares no non-template file`);
+  return plain.path;
 }
 
 async function openDetailsFor(page: Page, filePath: string): Promise<void> {
@@ -175,14 +186,14 @@ test.describe('module detail pages: deep-check 5 representative modules', () => 
     });
   }
 
-  test('verification (rules-only, 3 files): every file copies byte-exact against its raw endpoint', async ({
+  test('verification (small module): every file copies byte-exact against its raw endpoint', async ({
     page,
     request,
   }, testInfo) => {
     test.skip(testInfo.project.name !== 'chromium', 'real clipboard read-back needs Chromium/CDP');
 
     const declaredPaths = readRealModuleFileKeys('verification');
-    expect(declaredPaths).toHaveLength(3);
+    expect(declaredPaths).toHaveLength(readRealModuleFiles('verification').length);
 
     await page.goto('/modules/verification');
     for (const path of declaredPaths) {
@@ -190,7 +201,7 @@ test.describe('module detail pages: deep-check 5 representative modules', () => 
     }
   });
 
-  test('autoheal (hook/lib/script-heavy, 39 files, no status, merge fragment): file copy, merge treatment, placeholder treatment, no status badge', async ({
+  test('autoheal (hook/lib/script-heavy, no status, merge fragment): file copy, merge treatment, placeholder treatment, no status badge', async ({
     page,
     request,
   }, testInfo) => {
@@ -201,20 +212,20 @@ test.describe('module detail pages: deep-check 5 representative modules', () => 
     await expectMergeTreatment(page, 'settings.partial.json');
     await expectPlaceholderAnnotation(page, 'lib/com.__USERNAME__.ccgm.autoheal.daily.plist.template', true);
     await expectPlaceholderAnnotation(page, 'lib/autoheal.cron.template', true);
-    // A regular, non-template rule file must NOT carry the annotation.
-    await expectPlaceholderAnnotation(page, 'skills/autoheal-reference/SKILL.md', false);
+    // A regular, non-template file must NOT carry the annotation.
+    await expectPlaceholderAnnotation(page, firstPlainFile('autoheal'), false);
 
     test.skip(testInfo.project.name !== 'chromium', 'real clipboard read-back needs Chromium/CDP');
-    // Representative sample: the merge fragment, a placeholder file, an
-    // ordinary inlined file, and (per computeInlineBudget over the real
-    // data) the one file the 250 KB page budget pushes out of line --
-    // bin/autoheal-analyze.sh -- covering both CopyButton modes.
+    // Representative sample: the merge fragment, an ordinary inlined file,
+    // and bin/autoheal-analyze.sh, which computeInlineBudget over the real
+    // data pushes out of line (the 250 KB page budget defers the larger
+    // bin/ scripts) -- covering both CopyButton modes.
     await expectFileCopyByteExact(page, request, 'autoheal', 'settings.partial.json');
     await expectFileCopyByteExact(page, request, 'autoheal', 'skills/autoheal-reference/SKILL.md');
     await expectFileCopyByteExact(page, request, 'autoheal', 'bin/autoheal-analyze.sh');
   });
 
-  test('dreaming (status: beta, 39 files): beta badge renders, placeholder files annotated, large files copy byte-exact via fetch mode', async ({
+  test('dreaming (status: beta): beta badge renders, placeholder files annotated, large files copy byte-exact via fetch mode', async ({
     page,
     request,
   }, testInfo) => {
@@ -226,9 +237,8 @@ test.describe('module detail pages: deep-check 5 representative modules', () => 
     await expectPlaceholderAnnotation(page, 'lib/dreaming.cron.template', true);
 
     test.skip(testInfo.project.name !== 'chromium', 'real clipboard read-back needs Chromium/CDP');
-    // dream_analyze.py (82,786 bytes) and apply_dream_proposal.py
-    // (131,841 bytes) both exceed the 64 KB per-file inline cap -- these
-    // exercise the non-inlined, fetch-based CopyButton path specifically.
+    // dream_analyze.py and apply_dream_proposal.py both exceed the 64 KB
+    // per-file inline cap -- these exercise the non-inlined, fetch-based CopyButton path specifically.
     await expectFileCopyByteExact(page, request, 'dreaming', 'lib/dream_analyze.py');
     await expectFileCopyByteExact(page, request, 'dreaming', 'lib/apply_dream_proposal.py');
     await expectFileCopyByteExact(page, request, 'dreaming', 'skills/dreaming/SKILL.md');
@@ -241,7 +251,7 @@ test.describe('module detail pages: deep-check 5 representative modules', () => 
     await page.goto('/modules/remote-server');
 
     await expectPlaceholderAnnotation(page, 'commands/onremote.md', true);
-    await expectPlaceholderAnnotation(page, 'settings.partial.json', false);
+    await expectPlaceholderAnnotation(page, firstPlainFile('remote-server'), false);
     await expectMergeTreatment(page, 'settings.partial.json');
 
     test.skip(testInfo.project.name !== 'chromium', 'real clipboard read-back needs Chromium/CDP');

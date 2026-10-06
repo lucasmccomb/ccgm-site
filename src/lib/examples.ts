@@ -493,8 +493,8 @@ Done. 2 removed, 1 preserved, 0 skipped, 1 branch(es) deleted.`,
     module: 'rule-authoring',
     summary: 'Attack a candidate rule with adversarial scenarios, then harden it with what got through.',
     whatHappens: [
-      'The command reads a rule file, pulls out its Iron Law, and generates five to seven adversarial scenarios that each combine three or more pressure vectors. It dispatches sub-agents against those scenarios twice -- once without the rule loaded to establish a baseline, once with it -- and records where the rule held and where an agent talked its way past it.',
-      'The rationalizations it captures are added to the rule\'s Rationalizations Table and the red flags to its Red Flags list. The run then re-tests against fresh scenarios to check the hardening held, and the report closes on one of three recommendations: ship as-is, iterate further, or sharpen the Iron Law.',
+      'The command reads a rule file, pulls out its one-sentence rule statement, and generates five to seven adversarial scenarios that each combine three or more pressure vectors. It dispatches sub-agents against those scenarios twice -- once without the rule loaded to establish a baseline, once with it -- and records where the rule held and where an agent talked its way past it.',
+      'The rationalizations it captures are added to the rule\'s Rationalizations Table and the red flags to its Red Flags list. The run then re-tests against fresh scenarios to check the hardening held, and the report closes on one of three recommendations: ship as-is, iterate further, or sharpen the rule statement.',
     ],
     blocks: [
       {

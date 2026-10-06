@@ -193,9 +193,11 @@ test.describe('module detail pages: deep-check 5 representative modules', () => 
     test.skip(testInfo.project.name !== 'chromium', 'real clipboard read-back needs Chromium/CDP');
 
     const declaredPaths = readRealModuleFileKeys('verification');
-    expect(declaredPaths).toHaveLength(readRealModuleFiles('verification').length);
+    expect(declaredPaths.length).toBeGreaterThan(0);
 
     await page.goto('/modules/verification');
+    // Independent sides: the rendered page vs the ingested module.json.
+    await expect(page.locator('[data-file-entry]')).toHaveCount(declaredPaths.length);
     for (const path of declaredPaths) {
       await expectFileCopyByteExact(page, request, 'verification', path);
     }

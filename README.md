@@ -87,7 +87,7 @@ ccgm adds roughly six modules a month; `tests/fixtures/repo-census.json`
 holds the current module, file, and type counts): `module.json.files` is
 a keyed object (not an array) whose entries span these real `type`
 values (`script`, `doc`, `lib`, `command`, `rule`, `hook`, `agent`,
-`skill`, `content`, `config`, `settings`, `skill-reference`); 12 files
+`skill`, `content`, `config`, `settings`, `skill-reference`); several files
 carry `merge: true` (settings fragments -- never rendered as a plain copy
 target, since copying one over `settings.json` would overwrite it rather
 than merge); some declared files have no extension (content-sniffed, not

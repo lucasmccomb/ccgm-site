@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest';
 /**
  * Pagefind index size budget (§5 E6 acceptance: "Pagefind index size within
  * a stated budget (file bodies excluded)"). Measured against the real
- * build: 1.09 MB against the real ccgm corpus (146 pages, 78 modules, 62
- * rules) with `data-pagefind-ignore` scoping file-content sections out of
+ * build: 1.09 MB against the real ccgm corpus (146 pages at the time of writing;
+ * see tests/fixtures/repo-census.json for current module and rule counts) with `data-pagefind-ignore` scoping file-content sections out of
  * the index -- on the module detail pages and, for the same reason, on the
  * /rules pages that show one of those same file bodies. Indexing them
  * would pull in a ~4.6 MB corpus of Python, shell, YAML, and JSON instead.

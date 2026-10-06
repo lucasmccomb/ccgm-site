@@ -83,15 +83,16 @@ reaches a copy surface; any file that was actually affected is listed in
 
 **Facts about ccgm's real data** (verified 2026-08-04, ccgm plan §1.4 --
 trust the live `src/generated/modules-index.json` over this list, since
-ccgm adds roughly six modules a month): 78 modules, `module.json.files` is
-a keyed object (not an array) with 508 entries across 12 real `type`
+ccgm adds roughly six modules a month; `tests/fixtures/repo-census.json`
+holds the current module, file, and type counts): `module.json.files` is
+a keyed object (not an array) whose entries span these real `type`
 values (`script`, `doc`, `lib`, `command`, `rule`, `hook`, `agent`,
-`skill`, `content`, `config`, `settings`, `skill-reference`); 12 files
+`skill`, `content`, `config`, `settings`, `skill-reference`); several files
 carry `merge: true` (settings fragments -- never rendered as a plain copy
 target, since copying one over `settings.json` would overwrite it rather
 than merge); some declared files have no extension (content-sniffed, not
 extension-filtered); `presets/*.json` are bare arrays of module names with
-no `description` field; `marketplacePlugin` is true for all 78 modules
+no `description` field; `marketplacePlugin` is true for every module
 (a perfect bijection with `.claude-plugin/marketplace.json`); most module
 descriptions exceed llms.txt's 120-char line budget, so `summarize()` is a
 real transformation the site performs, not a property of the source data.

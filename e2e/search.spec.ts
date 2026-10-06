@@ -416,7 +416,7 @@ test.describe('a11y sweep (E6-owned): /install, /agents, a mixed inline/preview 
     }, testInfo) => {
       test.skip(testInfo.project.name !== 'chromium', 'one authoritative a11y run per theme is enough');
 
-      // autoheal (39 files, hook/lib/script-heavy) mixes inlined and
+      // autoheal (hook/lib/script-heavy) mixes inlined and
       // over-the-64KB-cap preview files, unlike E5's verification-only
       // axe coverage (verification is small enough that every file
       // inlines -- it never exercises the preview-state markup at all).
